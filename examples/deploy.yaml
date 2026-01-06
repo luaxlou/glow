@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Host
+metadata:
+  name: local-dev
+spec:
+  publicIP: "127.0.0.1"
+  services:
+    mysql:
+      port: 3306
+      adminUser: root
+      adminPassword: "" 
+---
+apiVersion: v1
+kind: App
+metadata:
+  name: simple-app
+spec:
+  binary: ./bin/simple-app
+  workingDir: .
+  domain: app.local
+  # Dependencies are now managed in code via SDK registration
