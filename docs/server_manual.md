@@ -12,12 +12,26 @@
 
 ## 2. CLI 命令参考
 
-### `server`
+### `install`
+交互式安装向导，引导完成密钥生成、资源集成、系统服务注册与反向代理配置。
+
+```bash
+./glow-server install
+```
+
+### `serve`
 启动核心服务守护进程。同时开启 HTTP API Server (默认端口 32102) 与 TCP AppCenter (默认端口 32101)。
 
 ```bash
-# 启动服务 (需先运行 keygen)
-./glow-server server [--port 32102] [--app-center-port 32101] [--dir .]
+# 启动服务 (需先运行 install 或 keygen)
+./glow-server serve [--port 32102] [--app-center-port 32101] [--dir .]
+```
+
+### `info`
+显示当前服务器的配置状态、集成的资源信息及服务运行状态。
+
+```bash
+./glow-server info
 ```
 
 ### `keygen`
@@ -52,6 +66,7 @@ Auth: Header `Authorization: Bearer <API_KEY>`
 | POST | `/apps/start` | 启动应用 | `{ "name": "app1", "command": "./bin", "args": [], "port": 8080 }` |
 | POST | `/apps/stop` | 停止应用 | `{ "name": "app1" }` |
 | POST | `/apps/restart`| 重启应用 | `{ "name": "app1" }` |
+| POST | `/apps/delete` | 删除应用 | `{ "name": "app1" }` |
 | GET | `/apps/list` | 获取应用列表 | - |
 | GET | `/apps/logs` | 获取应用日志 | `?name=app1` |
 
@@ -65,6 +80,19 @@ Auth: Header `Authorization: Bearer <API_KEY>`
 | Method | Endpoint | Description | Payload |
 |--------|----------|-------------|---------|
 | POST | `/resources/provision` | 申请资源 | `{ "appName": "app1", "resourceType": "mysql", "resourceName": "db1" }` |
+
+### 网关与域名 (Ingress)
+| Method | Endpoint | Description | Payload |
+|--------|----------|-------------|---------|
+| POST | `/ingress/update` | 更新/创建 Nginx 路由 | `{ "app_name": "app1", "domain": "app1.com", "port": 8080 }` |
+| POST | `/ingress/delete` | 删除 Nginx 路由 | `{ "app_name": "app1" }` |
+| GET | `/ingress/list` | 列出所有路由 | - |
+
+### 声明式部署 (Manifest)
+| Method | Endpoint | Description | Payload |
+|--------|----------|-------------|---------|
+| POST | `/apply/host` | 应用主机配置 | JSON of Host Manifest |
+| POST | `/apply/app` | 应用部署配置 | JSON of App Manifest |
 
 ## 4. 核心机制详解
 

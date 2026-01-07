@@ -9,7 +9,7 @@ import (
 	"sync"
 
 	"github.com/luaxlou/glow/starter/glowapp"
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 var (
@@ -20,6 +20,14 @@ var (
 	localPath   string
 	schemas     []string
 )
+
+// Init configures the SQLite connection.
+// This must be called before DB().
+func Init(path string) {
+	mu.Lock()
+	defer mu.Unlock()
+	localPath = path
+}
 
 // ensureDefaults sets default values if they haven't been configured.
 func ensureDefaults() {
@@ -73,7 +81,7 @@ func DB() (*sql.DB, error) {
 		return nil, fmt.Errorf("sqlite file path not found")
 	}
 
-	conn, err := sql.Open("sqlite3", dbFile)
+	conn, err := sql.Open("sqlite", dbFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open sqlite connection: %w", err)
 	}

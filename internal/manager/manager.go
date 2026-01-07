@@ -255,6 +255,7 @@ func StartApp(req api.StartAppRequest) error {
 
 	app.Status = "RUNNING"
 	app.Pid = cmd.Process.Pid
+	app.StartTime = time.Now().UnixMilli()
 	statemanager.SaveApp(app)
 
 	go waitForExit(app.Name, cmd)
@@ -446,25 +447,23 @@ func scanAndMonitor() {
 			app.Status = "RUNNING"
 			app.Pid = activeInfo.Pid
 
-			// Reset restart count if stable
-			if app.RestartCount > 0 {
-				app.RestartCount = 0
-			}
-
 			// Update Stats using PID if process exists locally
-			// This avoids scanning all processes, just checking specific PID
-			if proc, err := process.NewProcess(int32(app.Pid)); err == nil {
-				cpu, _ := proc.CPUPercent()
-				mem, _ := proc.MemoryInfo()
-				ioStat, _ := proc.IOCounters()
+			if app.Pid > 0 {
+				if proc, err := process.NewProcess(int32(app.Pid)); err == nil {
+					cpu, _ := proc.CPUPercent()
+					mem, _ := proc.MemoryInfo()
+					ioStat, _ := proc.IOCounters()
+					createTime, _ := proc.CreateTime()
 
-				app.Stats.CPUPercent = cpu
-				if mem != nil {
-					app.Stats.MemoryUsage = mem.RSS
-				}
-				if ioStat != nil {
-					app.Stats.IOReadBytes = ioStat.ReadBytes
-					app.Stats.IOWriteBytes = ioStat.WriteBytes
+					app.Stats.CPUPercent = cpu
+					if mem != nil {
+						app.Stats.MemoryUsage = mem.RSS
+					}
+					if ioStat != nil {
+						app.Stats.IOReadBytes = ioStat.ReadBytes
+						app.Stats.IOWriteBytes = ioStat.WriteBytes
+					}
+					app.StartTime = createTime
 				}
 			}
 

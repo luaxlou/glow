@@ -20,10 +20,10 @@ func New() *Server {
 }
 
 func (s *Server) RegisterRoutes(r *gin.Engine) {
+	r.GET("/health", s.handleHealth)
+
 	// Apply Auth Middleware
 	r.Use(authMiddleware())
-
-	r.GET("/health", s.handleHealth)
 
 	// --- Config Management ---
 	r.Any("/config/*appName", s.handleConfig)
@@ -38,6 +38,10 @@ func (s *Server) RegisterRoutes(r *gin.Engine) {
 
 	// --- Resource Provisioning ---
 	r.POST("/resources/provision", s.handleProvisionResource)
+	r.GET("/resources/list", s.handleListResources) // New
+
+	// --- Node Management ---
+	r.GET("/node/status", s.handleNodeStatus) // New
 
 	// --- Ingress Management ---
 	r.POST("/ingress/update", s.handleUpdateIngress)
@@ -313,6 +317,24 @@ func (s *Server) handleProvisionResource(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, api.Response{Success: true, Message: "Resource provisioned", Data: config})
+}
+
+func (s *Server) handleListResources(c *gin.Context) {
+	resources, err := manager.ListResources()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, api.Response{Success: false, Message: err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, api.Response{Success: true, Data: resources})
+}
+
+func (s *Server) handleNodeStatus(c *gin.Context) {
+	node, err := manager.GetNodeStatus()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, api.Response{Success: false, Message: err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, api.Response{Success: true, Data: node})
 }
 
 func (s *Server) handleApplyHost(c *gin.Context) {

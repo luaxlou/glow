@@ -29,13 +29,13 @@ func Parse(data []byte) ([]interface{}, error) {
 		}
 
 		switch typeMeta.Kind {
-		case "Host":
+		case "Host", "Node":
 			var host api.Host
 			if err := node.Decode(&host); err != nil {
 				return nil, err
 			}
 			docs = append(docs, host)
-		case "App":
+		case "App", "Deployment":
 			var app api.App
 			if err := node.Decode(&app); err != nil {
 				return nil, err

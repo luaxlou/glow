@@ -1,9 +1,11 @@
 package config
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -31,18 +33,60 @@ func LoadClientConfig() (*ClientConfig, error) {
 		return nil, err
 	}
 
+	var cfg ClientConfig
 	data, err := os.ReadFile(path)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("config not found at %s. Please run 'init' or configure manually", path)
+		if !os.IsNotExist(err) {
+			return nil, err
 		}
-		return nil, err
+		// Config file doesn't exist, proceed with empty config
+	} else {
+		if err := yaml.Unmarshal(data, &cfg); err != nil {
+			return nil, err
+		}
 	}
 
-	var cfg ClientConfig
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return nil, err
+	updated := false
+	reader := bufio.NewReader(os.Stdin)
+
+	if cfg.ServerURL == "" {
+		fmt.Print("Enter Server URL (default: http://localhost:32102): ")
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			return nil, fmt.Errorf("failed to read input: %w", err)
+		}
+		input = strings.TrimSpace(input)
+		if input == "" {
+			cfg.ServerURL = "http://localhost:32102"
+		} else {
+			cfg.ServerURL = input
+		}
+		updated = true
 	}
+
+	if cfg.APIKey == "" {
+		fmt.Print("Enter API Key: ")
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			return nil, fmt.Errorf("failed to read input: %w", err)
+		}
+		cfg.APIKey = strings.TrimSpace(input)
+		if cfg.APIKey != "" {
+			updated = true
+		}
+	}
+
+	if updated {
+		if err := SaveClientConfig(&cfg); err != nil {
+			return nil, fmt.Errorf("failed to save config: %w", err)
+		}
+		fmt.Printf("Configuration saved to %s\n", path)
+	}
+
+	if cfg.APIKey == "" {
+		return nil, fmt.Errorf("api key is required")
+	}
+
 	return &cfg, nil
 }
 

@@ -1,6 +1,5 @@
 # Binaries
-glow
-glow-server
+bin/
 *.exe
 *.exe~
 *.dll
@@ -34,3 +33,6 @@ Thumbs.db
 # Project specific
 glow.db
 *.log
+scripts/
+./glow
+./glow-server
