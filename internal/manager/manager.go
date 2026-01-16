@@ -66,11 +66,7 @@ func StartApp(req api.StartAppRequest) error {
 
 	// Merge existing app info if request fields are missing
 	if existingApp != nil {
-		if req.Command == "" {
-			req.Command = existingApp.Command
-			// Assume if Command is missing, we should inherit AutoRestart too
-			req.AutoRestart = existingApp.AutoRestart
-		}
+		// Defer Command inheritance until after checking deployed binary
 		if req.Args == nil {
 			req.Args = existingApp.Args
 		}
@@ -79,6 +75,10 @@ func StartApp(req api.StartAppRequest) error {
 		}
 		if req.Env == nil {
 			req.Env = existingApp.Env
+		}
+		// Inherit AutoRestart if Command is missing (likely a restart)
+		if req.Command == "" {
+			req.AutoRestart = existingApp.AutoRestart
 		}
 	}
 
@@ -114,14 +114,29 @@ func StartApp(req api.StartAppRequest) error {
 
 	// 2. Rename Binary: glow_<name>
 	srcBinary := req.Command
-	// If srcBinary is empty here, it means it wasn't provided in request AND wasn't found in existingApp.
-	// This implies we are trying to start a non-existent app without a command.
-	if srcBinary == "" {
-		return fmt.Errorf("app '%s' not found or no command specified", req.Name)
-	}
 
 	dstBinaryName := "glow_" + req.Name
 	dstBinaryPath := filepath.Join(appDir, dstBinaryName)
+
+	// If srcBinary is empty, try to fall back to the previously deployed binary.
+	// Priority: 1) deployed glow_<name>, 2) existingApp.Command, 3) error
+	if srcBinary == "" {
+		if _, err := os.Stat(dstBinaryPath); err == nil {
+			// Use the deployed binary
+			srcBinary = dstBinaryPath
+			req.Command = dstBinaryPath
+		} else if existingApp != nil && existingApp.Command != "" {
+			// Fall back to existing command if it exists
+			if _, err := os.Stat(existingApp.Command); err == nil {
+				srcBinary = existingApp.Command
+				req.Command = existingApp.Command
+			} else {
+				return fmt.Errorf("app '%s' not found or no command specified", req.Name)
+			}
+		} else {
+			return fmt.Errorf("app '%s' not found or no command specified", req.Name)
+		}
+	}
 
 	// Check if src and dst are the same file to avoid overwriting
 	isSameFile := false

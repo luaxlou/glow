@@ -17,6 +17,11 @@ var deleteCmd = &cobra.Command{
 	Short: "Delete resources",
 }
 
+var createCmd = &cobra.Command{
+	Use:   "create",
+	Short: "Create a resource",
+}
+
 var deployCmd = &cobra.Command{
 	Use:   "deploy",
 	Short: "Deploy or update resources",
@@ -47,6 +52,7 @@ func init() {
 	rootCmd.AddCommand(getCmd)
 	rootCmd.AddCommand(describeCmd)
 	rootCmd.AddCommand(deleteCmd)
+	rootCmd.AddCommand(createCmd)
 	rootCmd.AddCommand(deployCmd)
 	rootCmd.AddCommand(startCmd)
 	rootCmd.AddCommand(stopCmd)

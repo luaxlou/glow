@@ -9,11 +9,113 @@ import (
 	"github.com/luaxlou/glow/internal/configmanager"
 	"github.com/luaxlou/glow/internal/statemanager"
 	"github.com/luaxlou/glow/pkg/api"
+	"github.com/shirou/gopsutil/v3/process"
 )
 
 var (
 // activeConns sync.Map // map[string]net.Conn (AppName -> Conn) -- Replaced by store.go
 )
+
+// mergeAppInfo preserves persisted fields when the incoming payload is partial.
+//
+// This is critical because apps connecting via TCP may only report runtime fields
+// (pid/port/status/stats) and omit lifecycle fields (command/env/workingDir/etc).
+func mergeAppInfo(existing api.AppInfo, incoming api.AppInfo) api.AppInfo {
+	merged := existing
+
+	// Prefer incoming for "runtime" / frequently updated fields when present.
+	if incoming.Status != "" {
+		merged.Status = incoming.Status
+	}
+	if incoming.Pid != 0 {
+		merged.Pid = incoming.Pid
+	}
+	if incoming.Port != 0 {
+		merged.Port = incoming.Port
+	}
+	if incoming.StartTime != 0 {
+		merged.StartTime = incoming.StartTime
+	}
+	// Stats is a struct; treat non-zero fields as updates but avoid clobbering if app sent zeroes.
+	if incoming.Stats.CPUPercent != 0 {
+		merged.Stats.CPUPercent = incoming.Stats.CPUPercent
+	}
+	if incoming.Stats.MemoryUsage != 0 {
+		merged.Stats.MemoryUsage = incoming.Stats.MemoryUsage
+	}
+	if incoming.Stats.IOReadBytes != 0 {
+		merged.Stats.IOReadBytes = incoming.Stats.IOReadBytes
+	}
+	if incoming.Stats.IOWriteBytes != 0 {
+		merged.Stats.IOWriteBytes = incoming.Stats.IOWriteBytes
+	}
+
+	// Preserve important lifecycle/config fields unless incoming explicitly provides them.
+	merged.Name = incoming.Name // same key; keep explicit
+
+	if incoming.Command != "" {
+		merged.Command = incoming.Command
+	}
+	if incoming.Args != nil {
+		merged.Args = incoming.Args
+	}
+	if incoming.WorkingDir != "" {
+		merged.WorkingDir = incoming.WorkingDir
+	}
+	if incoming.Env != nil {
+		merged.Env = incoming.Env
+	}
+	if incoming.Config != nil {
+		merged.Config = incoming.Config
+	}
+	if incoming.Domain != "" {
+		merged.Domain = incoming.Domain
+	}
+
+	// AutoRestart is server-side config; only promote "true" from incoming.
+	if incoming.AutoRestart {
+		merged.AutoRestart = true
+	}
+	// RestartCount should not be reset by app payloads.
+	if incoming.RestartCount != 0 {
+		merged.RestartCount = incoming.RestartCount
+	}
+
+	if incoming.ConfigHash != "" {
+		merged.ConfigHash = incoming.ConfigHash
+	}
+	if incoming.BinaryHash != "" {
+		merged.BinaryHash = incoming.BinaryHash
+	}
+
+	return merged
+}
+
+// enrichAppInfoFromPID attempts to infer missing fields for legacy clients.
+// Some app clients only report runtime fields and omit Command/WorkingDir.
+func enrichAppInfoFromPID(appInfo *api.AppInfo) {
+	if appInfo == nil || appInfo.Pid == 0 {
+		return
+	}
+	// Only fill blanks; never override what the client explicitly provided.
+	if appInfo.Command != "" && appInfo.WorkingDir != "" {
+		return
+	}
+	p, err := process.NewProcess(int32(appInfo.Pid))
+	if err != nil {
+		return
+	}
+	if appInfo.Command == "" {
+		if exe, err := p.Exe(); err == nil && exe != "" {
+			appInfo.Command = exe
+		}
+	}
+	if appInfo.WorkingDir == "" {
+		if cwd, err := p.Cwd(); err == nil && cwd != "" {
+			appInfo.WorkingDir = cwd
+		}
+	}
+}
 
 func Start(port int) error {
 
@@ -97,8 +199,12 @@ func handleConnection(conn net.Conn) {
 				if appInfo.Name == "glow-server" {
 					resp = api.Response{Success: false, Message: "Registration denied: 'glow-server' is reserved."}
 				} else {
-					// We use store directly to save/update app info
-					// This allows external apps to register themselves
+					enrichAppInfoFromPID(&appInfo)
+					// Merge with existing persisted info to avoid clobbering required fields.
+					if existing, err := statemanager.GetApp(appInfo.Name); err == nil && existing != nil {
+						appInfo = mergeAppInfo(*existing, appInfo)
+					}
+
 					if err := statemanager.SaveApp(appInfo); err != nil {
 						resp = api.Response{Success: false, Message: err.Error()}
 					} else {
@@ -120,6 +226,10 @@ func handleConnection(conn net.Conn) {
 					RegisterActiveApp(appInfo, conn)
 
 					// 1. Record state (memory & sqlite)
+					enrichAppInfoFromPID(&appInfo)
+					if existing, err := statemanager.GetApp(appInfo.Name); err == nil && existing != nil {
+						appInfo = mergeAppInfo(*existing, appInfo)
+					}
 					if err := statemanager.SaveApp(appInfo); err != nil {
 						log.Printf("Error saving app state for %s: %v", appInfo.Name, err)
 						// We continue even if save fails, to try to return config

@@ -19,7 +19,7 @@ var getIngressCmd = &cobra.Command{
 			return
 		}
 		data, _ := json.Marshal(resp.Data)
-		
+
 		type IngressItem struct {
 			Name   string `json:"name"`
 			Port   int    `json:"port"`
@@ -38,6 +38,44 @@ var getIngressCmd = &cobra.Command{
 			})
 		}
 		printTable(headers, rows)
+	},
+}
+
+var createIngressCmd = &cobra.Command{
+	Use:   "ingress <name>",
+	Short: "Create an ingress rule",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		name := args[0]
+		domain, _ := cmd.Flags().GetString("domain")
+		port, _ := cmd.Flags().GetInt("port")
+		service, _ := cmd.Flags().GetString("service")
+
+		if domain == "" {
+			fmt.Println("Error: --domain is required")
+			return
+		}
+
+		req := api.IngressUpdateRequest{
+			Domain: domain,
+			Port:   port,
+		}
+		if service != "" {
+			req.AppName = service
+		} else {
+			req.AppName = name
+		}
+
+		var resp api.Response
+		if err := request("POST", "/ingress/update", req, &resp); err != nil {
+			fmt.Printf("Error: %v\n", err)
+			return
+		}
+		if resp.Success {
+			fmt.Printf("Ingress %s created\n", name)
+		} else {
+			fmt.Printf("Error: %s\n", resp.Message)
+		}
 	},
 }
 
@@ -63,5 +101,10 @@ var deleteIngressCmd = &cobra.Command{
 
 func init() {
 	getCmd.AddCommand(getIngressCmd)
+	createCmd.AddCommand(createIngressCmd)
 	deleteCmd.AddCommand(deleteIngressCmd)
+
+	createIngressCmd.Flags().String("domain", "", "Domain name")
+	createIngressCmd.Flags().Int("port", 0, "Target port (optional if app running)")
+	createIngressCmd.Flags().String("service", "", "Target service/app name (optional if same as ingress name)")
 }

@@ -7,12 +7,15 @@ import (
 	"time"
 
 	"github.com/luaxlou/glow/internal/configmanager"
+	"github.com/luaxlou/glow/internal/statemanager"
 	"github.com/luaxlou/glow/pkg/api"
+	"github.com/luaxlou/glow/starter/glowsqlite"
 )
 
 func TestAppManager_StartApp(t *testing.T) {
 	// Setup temp dir
 	tmpDir := t.TempDir()
+	t.Cleanup(func() { _ = os.Remove("glow.db") })
 
 	// Initialize Config
 	if err := configmanager.EnsureInitialized(); err != nil {
@@ -104,7 +107,78 @@ done
 			}
 		}
 	}
+}
 
-	// Clean up DB
-	os.Remove("glow.db")
+func TestAppManager_StartApp_FallbackToDeployedBinaryWhenCommandMissing(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Cleanup(func() { _ = os.Remove("glow.db") })
+
+	// Reset DB connection to ensure fresh state
+	glowsqlite.Reload()
+
+	if err := configmanager.EnsureInitialized(); err != nil {
+		t.Fatalf("Failed to init config manager: %v", err)
+	}
+	configmanager.SetSystemConfig("data_dir", tmpDir)
+	configmanager.SetSystemConfig("api_key", "test-key")
+	configmanager.SetSystemConfig("server_url", "127.0.0.1:8080")
+
+	// Pre-create deployed binary at apps/<name>/glow_<name>
+	// Use a unique app name to avoid conflicts with other tests
+	appName := "fallback-test-app"
+	appDir := filepath.Join(tmpDir, "apps", appName)
+	if err := os.MkdirAll(appDir, 0755); err != nil {
+		t.Fatalf("Failed to create app dir: %v", err)
+	}
+	deployedBin := filepath.Join(appDir, "glow_"+appName)
+	scriptContent := `#!/bin/sh
+echo "Starting dummy app"
+while true; do
+  echo "running"
+  sleep 1
+done
+`
+	if err := os.WriteFile(deployedBin, []byte(scriptContent), 0755); err != nil {
+		t.Fatalf("Failed to create deployed binary: %v", err)
+	}
+
+	// Verify file exists
+	if _, err := os.Stat(deployedBin); err != nil {
+		t.Fatalf("Deployed binary not found after creation: %v (path: %s)", err, deployedBin)
+	}
+
+	// Clean up any existing database records from previous test runs
+	// Use statemanager.DeleteApp to only remove DB record, not filesystem
+	_ = statemanager.DeleteApp(appName)
+
+	// Start with missing Command; should fall back to deployedBin.
+	req := api.StartAppRequest{
+		Name:        appName,
+		Command:     "",
+		AutoRestart: false,
+	}
+	if err := StartApp(req); err != nil {
+		t.Fatalf("StartApp failed: %v", err)
+	}
+
+	// Verify the app started with the correct command
+	time.Sleep(200 * time.Millisecond)
+	apps := ListApps()
+	found := false
+	for _, app := range apps {
+		if app.Name == appName {
+			found = true
+			if app.Command != deployedBin {
+				t.Errorf("Expected Command to be %s, got %s", deployedBin, app.Command)
+			}
+		}
+	}
+	if !found {
+		t.Errorf("App %s not found after start", appName)
+	}
+
+	// Stop to avoid leaking process.
+	if err := StopApp(appName); err != nil {
+		t.Fatalf("StopApp failed: %v", err)
+	}
 }

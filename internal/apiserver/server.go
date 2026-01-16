@@ -11,6 +11,7 @@ import (
 	"github.com/luaxlou/glow/internal/manager"
 	"github.com/luaxlou/glow/internal/statemanager"
 	"github.com/luaxlou/glow/pkg/api"
+	"github.com/shirou/gopsutil/v3/process"
 )
 
 type Server struct{}
@@ -266,6 +267,41 @@ func (s *Server) handleRestartApp(c *gin.Context) {
 	if targetApp == nil {
 		c.JSON(http.StatusNotFound, api.Response{Success: false, Message: "App not found"})
 		return
+	}
+
+	// Legacy support: apps may have registered without Command/WorkingDir. Try to infer from PID.
+	if targetApp.Command == "" && targetApp.Pid != 0 {
+		if p, err := process.NewProcess(int32(targetApp.Pid)); err == nil {
+			if exe, err := p.Exe(); err == nil && exe != "" {
+				targetApp.Command = exe
+			}
+			if targetApp.WorkingDir == "" {
+				if cwd, err := p.Cwd(); err == nil && cwd != "" {
+					targetApp.WorkingDir = cwd
+				}
+			}
+		}
+	}
+
+	// If Command is still empty, check for deployed binary
+	if targetApp.Command == "" {
+		dataDir, _ := configmanager.GetSystemConfig("data_dir")
+		if dataDir == "" {
+			dataDir = "."
+		}
+		if absDir, err := filepath.Abs(dataDir); err == nil {
+			dataDir = absDir
+		}
+		appDir := filepath.Join(dataDir, "apps", targetApp.Name)
+		dstBinaryPath := filepath.Join(appDir, "glow_"+targetApp.Name)
+		
+		// Check if deployed binary exists
+		if _, err := os.Stat(dstBinaryPath); err == nil {
+			targetApp.Command = dstBinaryPath
+		} else {
+			c.JSON(http.StatusBadRequest, api.Response{Success: false, Message: fmt.Sprintf("Failed to restart: app '%s' not found or no command specified", req.Name)})
+			return
+		}
 	}
 
 	// 2. Stop first (ignore error if already stopped)

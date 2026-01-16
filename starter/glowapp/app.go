@@ -56,12 +56,17 @@ func SetInfo(p int, d string) {
 func registerApp() {
 	// Simple registration with basic info
 	// In real world, we might want to retry or do this periodically (heartbeat)
+	exe, _ := os.Executable()
+	cwd, _ := os.Getwd()
 	info := api.AppInfo{
-		Name:   name,
-		Pid:    os.Getpid(),
-		Status: "RUNNING",
-		Port:   port,
-		Domain: domain,
+		Name:       name,
+		Pid:        os.Getpid(),
+		Status:     "RUNNING",
+		Port:       port,
+		Domain:     domain,
+		Command:    exe,
+		Args:       os.Args[1:],
+		WorkingDir: cwd,
 	}
 
 	config.Start(info)
