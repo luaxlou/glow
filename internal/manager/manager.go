@@ -45,8 +45,13 @@ func StartApp(req api.StartAppRequest) error {
 	var existingDomain string
 	var existingConfigHash string
 	var existingBinaryHash string
+	var existingApp *api.AppInfo
 
-	if existingApp, err := statemanager.GetApp(req.Name); err == nil {
+	log.Printf("StartApp: %s (Command: %s)", req.Name, req.Command)
+
+	if app, err := statemanager.GetApp(req.Name); err == nil {
+		existingApp = app
+		log.Printf("Found existing app: %s (Status: %s, Command: %s)", app.Name, app.Status, app.Command)
 		if existingApp.Status == "RUNNING" {
 			// Idempotent: return success if already running
 			return nil
@@ -57,6 +62,24 @@ func StartApp(req api.StartAppRequest) error {
 		existingDomain = existingApp.Domain
 		existingConfigHash = existingApp.ConfigHash
 		existingBinaryHash = existingApp.BinaryHash
+	}
+
+	// Merge existing app info if request fields are missing
+	if existingApp != nil {
+		if req.Command == "" {
+			req.Command = existingApp.Command
+			// Assume if Command is missing, we should inherit AutoRestart too
+			req.AutoRestart = existingApp.AutoRestart
+		}
+		if req.Args == nil {
+			req.Args = existingApp.Args
+		}
+		if req.WorkingDir == "" {
+			req.WorkingDir = existingApp.WorkingDir
+		}
+		if req.Env == nil {
+			req.Env = existingApp.Env
+		}
 	}
 
 	port, err := GetFreePort()
@@ -91,25 +114,48 @@ func StartApp(req api.StartAppRequest) error {
 
 	// 2. Rename Binary: glow_<name>
 	srcBinary := req.Command
+	// If srcBinary is empty here, it means it wasn't provided in request AND wasn't found in existingApp.
+	// This implies we are trying to start a non-existent app without a command.
+	if srcBinary == "" {
+		return fmt.Errorf("app '%s' not found or no command specified", req.Name)
+	}
+
 	dstBinaryName := "glow_" + req.Name
 	dstBinaryPath := filepath.Join(appDir, dstBinaryName)
 
-	// Attempt to copy if source exists
-	if _, err := os.Stat(srcBinary); err == nil {
-		if err := copyFile(srcBinary, dstBinaryPath); err != nil {
-			return fmt.Errorf("failed to copy binary: %w", err)
+	// Check if src and dst are the same file to avoid overwriting
+	isSameFile := false
+	if absSrc, err := filepath.Abs(srcBinary); err == nil {
+		if absDst, err := filepath.Abs(dstBinaryPath); err == nil {
+			if absSrc == absDst {
+				isSameFile = true
+			}
 		}
-		if err := os.Chmod(dstBinaryPath, 0755); err != nil {
-			return fmt.Errorf("failed to chmod binary: %w", err)
+	}
+
+	// Attempt to copy if source exists and is not the same as destination
+	if !isSameFile {
+		if _, err := os.Stat(srcBinary); err == nil {
+			if err := copyFile(srcBinary, dstBinaryPath); err != nil {
+				return fmt.Errorf("failed to copy binary: %w", err)
+			}
+			if err := os.Chmod(dstBinaryPath, 0755); err != nil {
+				return fmt.Errorf("failed to chmod binary: %w", err)
+			}
+		} else {
+			// If source not found, check if destination already exists (restart scenario)
+			if _, err := os.Stat(dstBinaryPath); err != nil {
+				// If neither exists, fallback if it looks like a command
+				if strings.Contains(req.Command, string(os.PathSeparator)) {
+					return fmt.Errorf("binary not found: %s", req.Command)
+				}
+				dstBinaryPath = req.Command
+			}
 		}
 	} else {
-		// If source not found, check if destination already exists (restart scenario)
+		// If same file, verify it exists
 		if _, err := os.Stat(dstBinaryPath); err != nil {
-			// If neither exists, fallback if it looks like a command
-			if strings.Contains(req.Command, string(os.PathSeparator)) {
-				return fmt.Errorf("binary not found: %s", req.Command)
-			}
-			dstBinaryPath = req.Command
+			return fmt.Errorf("binary not found at expected location: %s", dstBinaryPath)
 		}
 	}
 
