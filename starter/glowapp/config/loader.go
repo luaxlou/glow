@@ -192,6 +192,54 @@ func applyConfig(data any) {
 	}
 }
 
+// ProvisionResource requests the server to provision a resource.
+func ProvisionResource(kind string, name string) (map[string]any, error) {
+	serverAddr := os.Getenv(EnvServerURL)
+	if serverAddr == "" {
+		serverAddr = "127.0.0.1:32101"
+	}
+	serverAddr = strings.TrimPrefix(serverAddr, "http://")
+	serverAddr = strings.TrimPrefix(serverAddr, "tcp://")
+
+	conn, err := net.DialTimeout("tcp", serverAddr, 2*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+
+	payload, _ := json.Marshal(map[string]string{
+		"kind": kind,
+		"name": name,
+	})
+
+	req := api.TCPRequest{
+		Action:  api.ActionProvision,
+		AppName: AppIdentity,
+		Payload: payload,
+	}
+
+	if err := json.NewEncoder(conn).Encode(req); err != nil {
+		return nil, err
+	}
+
+	var resp api.Response
+	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	if err := json.NewDecoder(conn).Decode(&resp); err != nil {
+		return nil, err
+	}
+
+	if !resp.Success {
+		return nil, fmt.Errorf("server error: %s", resp.Message)
+	}
+
+	// Response Data should be the resource config map
+	if data, ok := resp.Data.(map[string]any); ok {
+		return data, nil
+	}
+	
+	return nil, fmt.Errorf("invalid response data format")
+}
+
 // Register is deprecated, use Start instead. Kept for backward compatibility if needed,
 // but currently just wraps Start (though Start blocks).
 // Actually, Register was used to send AppInfo. Start does that too.

@@ -15,6 +15,12 @@ var rootCmd = &cobra.Command{
 		DisableDefaultCmd: true,
 	},
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		// Prefer local glow.db if exists, otherwise use home dir
+		if _, err := os.Stat("glow.db"); err == nil {
+			glowsqlite.Init("glow.db")
+			return
+		}
+
 		home, err := os.UserHomeDir()
 		if err != nil {
 			// Fallback if home dir cannot be found

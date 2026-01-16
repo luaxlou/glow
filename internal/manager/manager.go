@@ -210,6 +210,10 @@ func StartApp(req api.StartAppRequest) error {
 		cmd.SysProcAttr = &syscall.SysProcAttr{
 			Credential: &syscall.Credential{Uid: uint32(uid), Gid: uint32(gid)},
 		}
+	} else {
+		// Fallback: If 'glow' user doesn't exist, try to use current user
+		// But for debugging exec format error, we might want to ensure we aren't switching to a user with different env
+		// log.Printf("Warning: 'glow' user not found, running as current user")
 	}
 
 	// 4. Logs with rotation
