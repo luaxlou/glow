@@ -26,30 +26,6 @@ func runInfo(cmd *cobra.Command, args []string) {
 	// 1. Version and PID
 	fmt.Printf("PID: %d\n", os.Getpid())
 
-	// 2. API Key
-	apiKey, _ := configmanager.GetSystemConfig("api_key")
-	if apiKey != "" {
-		fmt.Printf("API Key: [CONFIGURED]\n")
-	} else {
-		fmt.Printf("API Key: [NOT FOUND]\n")
-	}
-
-	// 3. MySQL
-	var mysqlInfo api.MySQLConfig
-	if err := getSystemConfigJSON("mysql_info", &mysqlInfo); err == nil && mysqlInfo.Host != "" {
-		fmt.Printf("MySQL: %s:%d (User: %s, Databases: %d)\n", mysqlInfo.Host, mysqlInfo.Port, mysqlInfo.User, len(mysqlInfo.Databases))
-	} else {
-		fmt.Println("MySQL: [NOT CONFIGURED]")
-	}
-
-	// 4. Redis
-	var redisInfo api.RedisConfig
-	if err := getSystemConfigJSON("redis_info", &redisInfo); err == nil && redisInfo.Host != "" {
-		fmt.Printf("Redis: %s:%d\n", redisInfo.Host, redisInfo.Port)
-	} else {
-		fmt.Println("Redis: [NOT CONFIGURED]")
-	}
-
 	// 5. Nginx
 	var nginxInfo api.NginxSystemConfig
 	if err := getSystemConfigJSON("nginx_info", &nginxInfo); err == nil && nginxInfo.BinaryPath != "" {

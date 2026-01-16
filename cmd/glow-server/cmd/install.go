@@ -6,7 +6,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/luaxlou/glow/internal/configmanager"
 	"github.com/luaxlou/glow/internal/manager"
 	"github.com/luaxlou/glow/pkg/api"
 	"github.com/spf13/cobra"
@@ -28,25 +27,13 @@ func runInstall(cmd *cobra.Command, args []string) {
 	fmt.Println("Welcome to the Glow Server Installer!")
 	fmt.Println("-------------------------------------")
 
-	// 1. Keygen
-	if err := stepKeygen(reader); err != nil {
-		fmt.Printf("Keygen failed: %v\n", err)
-		return
-	}
-
-	// 2. Resources (MySQL, Redis, Nginx)
-	if err := stepResources(reader); err != nil {
-		fmt.Printf("Resource setup failed: %v\n", err)
-		return
-	}
-
-	// 3. Service Installation
+	// 1. Service Installation
 	if err := stepService(reader); err != nil {
 		fmt.Printf("Service installation failed: %v\n", err)
 		return
 	}
 
-	// 4. Ingress / Reverse Proxy
+	// 2. Ingress / Reverse Proxy
 	if err := stepIngress(reader); err != nil {
 		fmt.Printf("Ingress setup failed: %v\n", err)
 		return
@@ -55,58 +42,6 @@ func runInstall(cmd *cobra.Command, args []string) {
 	fmt.Println("\n-------------------------------------")
 	fmt.Println("Glow Server installation/configuration complete!")
 	fmt.Println("You can now run 'glow-server serve' to start the server.")
-}
-
-func stepKeygen(reader *bufio.Reader) error {
-	apiKey, _ := configmanager.GetSystemConfig("api_key")
-	if apiKey != "" {
-		fmt.Printf("API Key already exists. Keep current key? [Y/n]: ")
-		input, _ := reader.ReadString('\n')
-		input = strings.ToLower(strings.TrimSpace(input))
-		if input == "" || input == "y" {
-			fmt.Println("Keeping existing API Key.")
-			return nil
-		}
-	}
-
-	fmt.Println("Generating new API Key...")
-	// Reuse keygen logic
-	runKeygen(nil, nil)
-	return nil
-}
-
-func stepResources(reader *bufio.Reader) error {
-	fmt.Println("\nResource Integration Setup")
-	fmt.Println("Which resources would you like to configure? (comma separated: mysql,redis,nginx or 'all')")
-	fmt.Print("Resources [none]: ")
-	input, _ := reader.ReadString('\n')
-	input = strings.ToLower(strings.TrimSpace(input))
-
-	if input == "" || input == "none" {
-		return nil
-	}
-
-	resources := strings.Split(input, ",")
-	if input == "all" {
-		resources = []string{"mysql", "redis", "nginx"}
-	}
-
-	for _, r := range resources {
-		r = strings.TrimSpace(r)
-		switch r {
-		case "mysql":
-			fmt.Println("\nConfiguring MySQL...")
-			runAddMysql(nil, nil)
-		case "redis":
-			fmt.Println("\nConfiguring Redis...")
-			runAddRedis(nil, nil)
-		case "nginx":
-			fmt.Println("\nConfiguring Nginx...")
-			runAddNginx(nil, nil)
-		}
-	}
-
-	return nil
 }
 
 func stepService(reader *bufio.Reader) error {

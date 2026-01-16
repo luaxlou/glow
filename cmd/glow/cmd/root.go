@@ -12,9 +12,10 @@ import (
 )
 
 var (
-	cfgFile   string
-	serverURL string
-	apiKey    string
+	cfgFile     string
+	serverURL   string
+	apiKey      string
+	contextFlag string
 )
 
 type Config struct {
@@ -61,6 +62,7 @@ func Execute() {
 func init() {
 	home, _ := os.UserHomeDir()
 	cfgFile = filepath.Join(home, ".glow.json")
+	rootCmd.PersistentFlags().StringVar(&contextFlag, "context", "", "name of the kubeconfig context to use")
 }
 
 func ensureConfig() error {
@@ -99,9 +101,15 @@ func ensureConfig() error {
 		fmt.Println("Configuration saved.")
 	}
 
+	// Determine which context to use
+	targetContext := cfg.CurrentContext
+	if contextFlag != "" {
+		targetContext = contextFlag
+	}
+
 	// Set globals from current context
 	for _, ctx := range cfg.Contexts {
-		if ctx.Name == cfg.CurrentContext {
+		if ctx.Name == targetContext {
 			serverURL = ctx.ServerURL
 			apiKey = ctx.APIKey
 			break
@@ -109,7 +117,7 @@ func ensureConfig() error {
 	}
 	
 	if serverURL == "" {
-		return fmt.Errorf("current context '%s' not found or invalid", cfg.CurrentContext)
+		return fmt.Errorf("context '%s' not found or invalid", targetContext)
 	}
 
 	return nil

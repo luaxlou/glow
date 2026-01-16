@@ -17,7 +17,6 @@ Glow 覆盖了应用从诞生到运行的两个关键阶段：
 ### 1. 开发态 (Development) - 标准化 Starter
 Glow 提供了一套类似 Spring Boot 的 Starter 机制（`glow/starter`），确立了 Go 应用的标准骨架：
 *   **配置中心集成**: Starter 启动时自动连接 `glow-server` 获取配置，支持动态热更新，彻底告别本地配置文件。
-*   **资源即代码**: 自动识别并初始化依赖组件（MySQL, Redis, Gin 等），应用启动时自动向 Server 申请资源凭据。
 *   **内建可观测性**: 默认集成健康检查、版本元数据与基础监控指标。
 
 ### 2. 运行态 (Runtime) - 进程级治理
@@ -66,24 +65,18 @@ Glow 提供了一套类似 Spring Boot 的 Starter 机制（`glow/starter`），
     *   提供**自动重启**（Crash Loop Backoff）、**日志轮转**（Log Rotation）与**资源监控**（CPU/Mem/IO）。
     *   自动为应用分配空闲端口，并注入到环境变量 `OP_APP_PORT` 中。
 
-2.  **即时资源拨备 (JIT Provisioning)**
-    *   **Lazy Loading**: 当应用 Starter 初始化并请求数据库连接时，Server 才会动态响应。
-    *   **自动化鉴权**: Server 自动在宿主机的 MySQL/Redis 实例中创建专属的 Database 和 User，并将生成的凭据加密存储于内置 SQLite 中，随后返回给应用。开发者全程无需触碰连接字符串。
-
-3.  **自动化网关 (Ingress Automation)**
+2.  **自动化网关 (Ingress Automation)**
     *   根据应用声明的域名（Domain），自动生成并刷新 Nginx 配置文件（`upstream` & `server` block）。
     *   实现服务发现与负载均衡的自动化闭环，无需人工干预 Nginx。
 
-4.  **嵌入式配置中心**
+3.  **嵌入式配置中心**
     *   基于 SQLite 的轻量级配置存储，无外部依赖。
     *   提供 Restful API 供 Starter 拉取配置，支持配置的版本化与持久化。
 
 ### 交互流程
 1.  **启动**: 开发者执行 `go run main.go` 或 `glow start`。
 2.  **注册**: Starter 向本地 `glow-server` 注册身份。
-3.  **申请**: Starter 请求依赖（如 "I need a MySQL db named 'billing'"）。
-4.  **拨备**: Server 检查资源池，创建数据库账号，返回 DSN。
-5.  **运行**: 应用启动 HTTP Server，Server 接管其 PID 并配置 Nginx 路由。
+3.  **运行**: 应用启动 HTTP Server，Server 接管其 PID 并配置 Nginx 路由。
 
 ## 快速开始 (Quick Start)
 
@@ -94,10 +87,7 @@ Glow 提供了一套类似 Spring Boot 的 Starter 机制（`glow/starter`），
 # 1. 编译
 go build -o glow-server cmd/glow-server/main.go
 
-# 2. 生成 API Key 并初始化系统配置
-./glow-server keygen
-
-# 3. 启动 Server (同时启动 HTTP API :32102 与 TCP AppCenter :32101)
+# 2. 启动 Server (同时启动 HTTP API :32102 与 TCP AppCenter :32101)
 ./glow-server serve
 ```
 
@@ -117,8 +107,6 @@ go run main.go
 1.  终端显示 `App simple-app started`。
 2.  Server 端日志显示接收到连接与注册请求。
 3.  访问 `http://localhost:8080` 可看到 "Hello from Implicit-wiring app with Gin!"。
-
-> **注意**: 默认情况下未配置 Host 数据库信息，应用会提示 "MySQL not available" 并以降级模式运行。如需体验完整的数据库自动拨备，请参考进阶文档配置 `host.json`。
 
 ## 📚 文档 (Documentation)
 
