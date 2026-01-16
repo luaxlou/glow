@@ -32,11 +32,11 @@ var getAppCmd = &cobra.Command{
 			if app.StartTime > 0 {
 				age = time.Since(time.UnixMilli(app.StartTime)).Round(time.Second).String()
 			}
-						mem := fmt.Sprintf("%.1f MB", float64(app.Stats.MemoryUsage)/1024/1024)
-						
-						rows = append(rows, []string{
-							app.Name,
-			
+			mem := fmt.Sprintf("%.1f MB", float64(app.Stats.MemoryUsage)/1024/1024)
+
+			rows = append(rows, []string{
+				app.Name,
+
 				app.Status,
 				strconv.Itoa(app.RestartCount),
 				age,
@@ -87,7 +87,7 @@ var describeAppCmd = &cobra.Command{
 		fmt.Printf("Command:    %s\n", target.Command)
 		fmt.Printf("Args:       %v\n", target.Args)
 		fmt.Printf("WorkDir:    %s\n", target.WorkingDir)
-		
+
 		age := "-"
 		if target.StartTime > 0 {
 			age = time.Since(time.UnixMilli(target.StartTime)).Round(time.Second).String()
@@ -97,7 +97,7 @@ var describeAppCmd = &cobra.Command{
 		fmt.Println("Resources:")
 		fmt.Printf("  CPU:      %.2f%%\n", target.Stats.CPUPercent)
 		fmt.Printf("  Memory:   %d bytes\n", target.Stats.MemoryUsage)
-		
+
 		fmt.Println("Config:")
 		if target.Config != nil {
 			configBytes, _ := json.MarshalIndent(target.Config, "  ", "  ")
@@ -131,64 +131,49 @@ var deleteAppCmd = &cobra.Command{
 }
 
 // --- Lifecycle Commands ---
-var startAppCmd = &cobra.Command{
-	Use:   "app [name]",
-	Short: "Start an application",
-	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		name := args[0]
-		req := api.StartAppRequest{Name: name}
-		var resp api.Response
-		if err := request("POST", "/apps/start", req, &resp); err != nil {
-			fmt.Printf("Error: %v\n", err)
-			return
-		}
-		if resp.Success {
-			fmt.Printf("app.apps/%s started\n", name)
-		} else {
-			fmt.Printf("Error: %s\n", resp.Message)
-		}
-	},
+func runStartApp(cmd *cobra.Command, args []string) {
+	name := args[0]
+	req := api.StartAppRequest{Name: name}
+	var resp api.Response
+	if err := request("POST", "/apps/start", req, &resp); err != nil {
+		fmt.Printf("Error: %v\n", err)
+		return
+	}
+	if resp.Success {
+		fmt.Printf("app.apps/%s started\n", name)
+	} else {
+		fmt.Printf("Error: %s\n", resp.Message)
+	}
 }
 
-var stopAppCmd = &cobra.Command{
-	Use:   "app [name]",
-	Short: "Stop an application",
-	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		name := args[0]
-		req := map[string]string{"name": name}
-		var resp api.Response
-		if err := request("POST", "/apps/stop", req, &resp); err != nil {
-			fmt.Printf("Error: %v\n", err)
-			return
-		}
-		if resp.Success {
-			fmt.Printf("app.apps/%s stopped\n", name)
-		} else {
-			fmt.Printf("Error: %s\n", resp.Message)
-		}
-	},
+func runStopApp(cmd *cobra.Command, args []string) {
+	name := args[0]
+	req := map[string]string{"name": name}
+	var resp api.Response
+	if err := request("POST", "/apps/stop", req, &resp); err != nil {
+		fmt.Printf("Error: %v\n", err)
+		return
+	}
+	if resp.Success {
+		fmt.Printf("app.apps/%s stopped\n", name)
+	} else {
+		fmt.Printf("Error: %s\n", resp.Message)
+	}
 }
 
-var restartAppCmd = &cobra.Command{
-	Use:   "app [name]",
-	Short: "Restart an application",
-	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		name := args[0]
-		req := map[string]string{"name": name}
-		var resp api.Response
-		if err := request("POST", "/apps/restart", req, &resp); err != nil {
-			fmt.Printf("Error: %v\n", err)
-			return
-		}
-		if resp.Success {
-			fmt.Printf("app.apps/%s restarted\n", name)
-		} else {
-			fmt.Printf("Error: %s\n", resp.Message)
-		}
-	},
+func runRestartApp(cmd *cobra.Command, args []string) {
+	name := args[0]
+	req := map[string]string{"name": name}
+	var resp api.Response
+	if err := request("POST", "/apps/restart", req, &resp); err != nil {
+		fmt.Printf("Error: %v\n", err)
+		return
+	}
+	if resp.Success {
+		fmt.Printf("app.apps/%s restarted\n", name)
+	} else {
+		fmt.Printf("Error: %s\n", resp.Message)
+	}
 }
 
 func init() {
@@ -198,14 +183,25 @@ func init() {
 	describeCmd.AddCommand(describeAppCmd)
 	// glow delete app
 	deleteCmd.AddCommand(deleteAppCmd)
-	
-	// glow start app
-	startCmd.AddCommand(startAppCmd)
-	// glow stop app
-	stopCmd.AddCommand(stopAppCmd)
-	// glow restart app
-	restartCmd.AddCommand(restartAppCmd)
-	
+
+	// glow start
+	startCmd.Use = "start [name]"
+	startCmd.Short = "Start an application"
+	startCmd.Args = cobra.ExactArgs(1)
+	startCmd.Run = runStartApp
+
+	// glow stop
+	stopCmd.Use = "stop [name]"
+	stopCmd.Short = "Stop an application"
+	stopCmd.Args = cobra.ExactArgs(1)
+	stopCmd.Run = runStopApp
+
+	// glow restart
+	restartCmd.Use = "restart [name]"
+	restartCmd.Short = "Restart an application"
+	restartCmd.Args = cobra.ExactArgs(1)
+	restartCmd.Run = runRestartApp
+
 	// glow logs <name> (Flat command, implement directly)
 	logsCmd.Run = func(cmd *cobra.Command, args []string) {
 		name := args[0]

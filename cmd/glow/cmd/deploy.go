@@ -24,13 +24,15 @@ func init() {
 	deployCmd.Short = "Deploy or update an application"
 	deployCmd.Args = cobra.ExactArgs(1)
 	deployCmd.Run = runDeploy
-	
+
 	deployCmd.Flags().String("name", "", "Name of the application (defaults to binary name)")
+	deployCmd.Flags().BoolP("force", "f", false, "Force update even if binary is unchanged")
 }
 
 func runDeploy(cmd *cobra.Command, args []string) {
 	binaryPath := args[0]
 	name, _ := cmd.Flags().GetString("name")
+	force, _ := cmd.Flags().GetBool("force")
 	if name == "" {
 		name = filepath.Base(binaryPath)
 	}
@@ -63,11 +65,15 @@ func runDeploy(cmd *cobra.Command, args []string) {
 	}
 
 	if existingApp != nil {
-		if existingApp.BinaryHash == localHash {
+		if existingApp.BinaryHash == localHash && !force {
 			fmt.Printf("App '%s' binary is unchanged (hash: %s). No update needed.\n", name, localHash)
 			return
 		}
-		fmt.Printf("App '%s' binary changed (remote: %s, local: %s). Updating...\n", name, existingApp.BinaryHash, localHash)
+		if force {
+			fmt.Printf("Forcing update for app '%s'...\n", name)
+		} else {
+			fmt.Printf("App '%s' binary changed (remote: %s, local: %s). Updating...\n", name, existingApp.BinaryHash, localHash)
+		}
 	} else {
 		fmt.Printf("Deploying new app '%s'...\n", name)
 	}
@@ -85,7 +91,7 @@ func runDeploy(cmd *cobra.Command, args []string) {
 		Name:    name,
 		Command: uploadedPath,
 	}
-	
+
 	// Preserve existing config/env if updating
 	if existingApp != nil {
 		req.Args = existingApp.Args

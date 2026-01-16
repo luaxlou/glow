@@ -30,6 +30,7 @@ upstream {{.Name}} {
 server {
     listen 80;
     server_name {{.Domain}};
+    client_max_body_size 100M;
 
     location / {
         proxy_pass http://{{.Name}};

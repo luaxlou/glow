@@ -35,6 +35,9 @@ func StartApp(req api.StartAppRequest) error {
 	if dataDir == "" {
 		dataDir = "."
 	}
+	if absDir, err := filepath.Abs(dataDir); err == nil {
+		dataDir = absDir
+	}
 
 	serverURL, _ := configmanager.GetSystemConfig("server_url")
 
@@ -226,6 +229,27 @@ func waitForExit(name string, cmd *exec.Cmd) {
 	}
 	app.Pid = 0
 	statemanager.SaveApp(*app)
+}
+
+// ListResources returns a summary of all managed resources (Apps, etc.)
+func ListResources() ([]api.ResourceRef, error) {
+	var resources []api.ResourceRef
+
+	// 1. Apps
+	apps, err := statemanager.ListApps()
+	if err == nil {
+		for _, app := range apps {
+			resources = append(resources, api.ResourceRef{
+				Kind: "App",
+				Name: app.Name,
+				Port: app.Port,
+			})
+		}
+	} else {
+		log.Printf("Warning: Failed to list apps for resource summary: %v", err)
+	}
+
+	return resources, nil
 }
 
 func StopApp(name string) error {
@@ -431,10 +455,10 @@ func scanAndMonitor() {
 			statemanager.SaveApp(app)
 
 			req := api.StartAppRequest{
-				Name:       app.Name,
-				Command:    app.Command,
-				Args:       app.Args,
-				WorkingDir: app.WorkingDir,
+				Name:        app.Name,
+				Command:     app.Command,
+				Args:        app.Args,
+				WorkingDir:  app.WorkingDir,
 				Env:         app.Env,
 				AutoRestart: app.AutoRestart,
 			}

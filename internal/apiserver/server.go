@@ -188,6 +188,9 @@ func (s *Server) handleUploadApp(c *gin.Context) {
 	if dataDir == "" {
 		dataDir = "."
 	}
+	if absDir, err := filepath.Abs(dataDir); err == nil {
+		dataDir = absDir
+	}
 	tempDir := filepath.Join(dataDir, "tmp", "uploads")
 	if err := os.MkdirAll(tempDir, 0755); err != nil {
 		c.JSON(http.StatusInternalServerError, api.Response{Success: false, Message: "Failed to create temp dir"})

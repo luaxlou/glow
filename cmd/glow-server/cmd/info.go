@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/luaxlou/glow/internal/configmanager"
 	"github.com/luaxlou/glow/pkg/api"
 	"github.com/spf13/cobra"
 )

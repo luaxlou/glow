@@ -85,10 +85,11 @@ Glow 提供了一套类似 Spring Boot 的 Starter 机制（`glow/starter`），
 
 ```bash
 # 1. 编译
-go build -o glow-server cmd/glow-server/main.go
+mkdir -p bin
+go build -o bin/glow-server cmd/glow-server/main.go
 
 # 2. 启动 Server (同时启动 HTTP API :32102 与 TCP AppCenter :32101)
-./glow-server serve
+./bin/glow-server serve
 ```
 
 ### 2. 运行示例应用
