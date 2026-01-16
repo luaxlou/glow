@@ -169,7 +169,9 @@ func (s *Server) handleConfig(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, api.Response{Success: false, Message: "Invalid JSON"})
 			return
 		}
-		if err := configmanager.Set(appName, newConfig, true); err != nil {
+
+		merge := c.Query("merge") != "false"
+		if err := configmanager.Set(appName, newConfig, merge); err != nil {
 			c.JSON(http.StatusInternalServerError, api.Response{Success: false, Message: "Failed to update config"})
 			return
 		}

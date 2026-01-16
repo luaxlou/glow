@@ -88,7 +88,7 @@ var editConfigCmd = &cobra.Command{
 
 		// 5. Update
 		var upResp api.Response
-		if err := request("PUT", "/config/"+appName, newData, &upResp); err != nil {
+		if err := request("PUT", "/config/"+appName+"?merge=false", newData, &upResp); err != nil {
 			fmt.Printf("Error: %v\n", err)
 			return
 		}
