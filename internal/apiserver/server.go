@@ -2,6 +2,7 @@ package apiserver
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -175,7 +176,7 @@ func (s *Server) handleConfig(c *gin.Context) {
 
 		// Notify AppCenter (Hot Reload)
 		if err := appcenter.SendConfigUpdate(appName, newConfig); err != nil {
-			fmt.Printf("Warning: failed to push config update to app %s: %v\n", appName, err)
+			log.Printf("Warning: failed to push config update to app %s: %v\n", appName, err)
 		}
 
 		c.JSON(http.StatusOK, api.Response{Success: true, Message: "Config updated"})

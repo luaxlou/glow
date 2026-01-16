@@ -80,6 +80,10 @@ func SendConfigUpdate(appName string, config map[string]any) error {
 		return fmt.Errorf("app %s not connected", appName)
 	}
 
+	if runtime.Conn == nil {
+		return fmt.Errorf("app %s has no active connection", appName)
+	}
+
 	resp := api.Response{
 		Success: true,
 		Data:    config,
