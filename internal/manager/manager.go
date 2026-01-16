@@ -18,7 +18,6 @@ import (
 
 	"github.com/luaxlou/glow/internal/appcenter"
 	"github.com/luaxlou/glow/internal/configmanager"
-	"github.com/luaxlou/glow/internal/provisioner"
 	"github.com/luaxlou/glow/internal/statemanager"
 	"github.com/luaxlou/glow/pkg/api"
 	"github.com/shirou/gopsutil/v3/process"
@@ -27,46 +26,6 @@ import (
 var (
 	mu sync.RWMutex
 )
-
-func ProvisionResource(req api.ProvisionRequest) (map[string]any, error) {
-	if req.ResourceType == "mysql" {
-		var mysqlConfig api.MySQLConfig
-		if err := configmanager.GetSystemConfigJSON("mysql_info", &mysqlConfig); err != nil {
-			return nil, fmt.Errorf("mysql info not found: %w", err)
-		}
-		if mysqlConfig.Host == "" {
-			return nil, fmt.Errorf("mysql service not configured")
-		}
-
-		p := provisioner.NewMySQL(api.ServiceSpec{
-			Port:          mysqlConfig.Port,
-			AdminUser:     mysqlConfig.User,
-			AdminPassword: mysqlConfig.Password,
-		})
-		if err := p.Check(); err != nil {
-			return nil, fmt.Errorf("mysql check failed: %w", err)
-		}
-
-		user, pass, err := p.Provision(req.ResourceName)
-		if err != nil {
-			return nil, fmt.Errorf("failed to provision mysql: %w", err)
-		}
-
-		configFragment := map[string]any{
-			"mysql": map[string]interface{}{
-				"dsn": fmt.Sprintf("%s:%s@tcp(127.0.0.1:%d)/%s?parseTime=true", user, pass, mysqlConfig.Port, req.ResourceName),
-			},
-		}
-
-		if err := configmanager.Set(req.AppName, configFragment, true); err != nil {
-			return nil, fmt.Errorf("failed to save config: %w", err)
-		}
-
-		return configFragment, nil
-	}
-
-	return nil, fmt.Errorf("unsupported resource type: %s", req.ResourceType)
-}
 
 func StartApp(req api.StartAppRequest) error {
 	mu.Lock()
@@ -78,7 +37,6 @@ func StartApp(req api.StartAppRequest) error {
 	}
 
 	serverURL, _ := configmanager.GetSystemConfig("server_url")
-	apiKey, _ := configmanager.GetSystemConfig("api_key")
 
 	var existingRestartCount int
 	var existingDomain string
@@ -195,7 +153,6 @@ func StartApp(req api.StartAppRequest) error {
 	cmd.Env = append(cmd.Env, fmt.Sprintf("OP_APP_PORT=%d", port))
 	cmd.Env = append(cmd.Env, fmt.Sprintf("OP_SERVER_URL=%s", serverURL))
 	cmd.Env = append(cmd.Env, fmt.Sprintf("OP_APP_NAME=%s", app.Name))
-	cmd.Env = append(cmd.Env, fmt.Sprintf("OP_API_KEY=%s", apiKey))
 
 	// 3. Run as glow user
 	if u, err := user.Lookup("glow"); err == nil {

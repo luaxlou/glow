@@ -19,7 +19,6 @@ const (
 	EnvConfig    = "OP_APP_CONFIG"
 	EnvServerURL = "OP_SERVER_URL"
 	EnvAppName   = "OP_APP_NAME"
-	EnvAPIKey    = "OP_API_KEY"
 )
 
 var (
@@ -108,7 +107,6 @@ func Start(appInfo api.AppInfo) {
 	req := api.TCPRequest{
 		Action:  api.ActionAppStart,
 		AppName: appInfo.Name,
-		APIKey:  os.Getenv(EnvAPIKey),
 		Payload: payload,
 	}
 
@@ -194,71 +192,6 @@ func applyConfig(data any) {
 	}
 }
 
-// ProvisionResource calls the OpServer to ensure a resource exists and returns its config
-func ProvisionResource(resourceType, resourceName string) (map[string]any, error) {
-	serverAddr := os.Getenv(EnvServerURL)
-	if serverAddr == "" {
-		serverAddr = "127.0.0.1:32101"
-	}
-	serverAddr = strings.TrimPrefix(serverAddr, "http://")
-	serverAddr = strings.TrimPrefix(serverAddr, "tcp://")
-
-	appName := os.Getenv(EnvAppName)
-	if appName == "" {
-		appName = AppIdentity
-	}
-
-	if appName == "" {
-		return nil, fmt.Errorf("OpServer connection info missing")
-	}
-
-	reqBody := api.ProvisionRequest{
-		AppName:      appName,
-		ResourceType: resourceType,
-		ResourceName: resourceName,
-	}
-
-	payload, _ := json.Marshal(reqBody)
-	req := api.TCPRequest{
-		Action:  api.ActionProvision,
-		AppName: appName,
-		APIKey:  os.Getenv(EnvAPIKey),
-		Payload: payload,
-	}
-
-	verboseLog("Provisioning resource: %s/%s", resourceType, resourceName)
-
-	resp, err := sendTCPRequest(serverAddr, req)
-	if err != nil {
-		return nil, err
-	}
-
-	if !resp.Success {
-		return nil, fmt.Errorf("provision failed: %s", resp.Message)
-	}
-
-	// Update local viper config with the new data
-	dataBytes, _ := json.Marshal(resp.Data)
-	// Must initialize v if load() hasn't run or failed
-	if v == nil {
-		v = viper.New()
-	}
-	v.SetConfigType("json")
-	v.MergeConfig(bytes.NewReader(dataBytes))
-
-	// Return map[string]any
-	var result map[string]any
-	if err := json.Unmarshal(dataBytes, &result); err != nil {
-		return nil, err
-	}
-
-	if checkVerbose() {
-		verboseLog("Provisioned Resource Config: %+v", result)
-	}
-
-	return result, nil
-}
-
 // Register is deprecated, use Start instead. Kept for backward compatibility if needed,
 // but currently just wraps Start (though Start blocks).
 // Actually, Register was used to send AppInfo. Start does that too.
@@ -267,25 +200,6 @@ func Register(appInfo api.AppInfo) error {
 	// For compatibility, we can just call Start, but Start doesn't return error.
 	Start(appInfo)
 	return nil
-}
-
-func sendTCPRequest(address string, req api.TCPRequest) (*api.Response, error) {
-	// Simple TCP Request/Response
-	conn, err := net.DialTimeout("tcp", address, 5*time.Second)
-	if err != nil {
-		return nil, err
-	}
-	defer conn.Close()
-
-	if err := json.NewEncoder(conn).Encode(req); err != nil {
-		return nil, err
-	}
-
-	var resp api.Response
-	if err := json.NewDecoder(conn).Decode(&resp); err != nil {
-		return nil, err
-	}
-	return &resp, nil
 }
 
 // Get unmarshals a specific key into the target structure.

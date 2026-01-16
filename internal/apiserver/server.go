@@ -22,9 +22,6 @@ func New() *Server {
 func (s *Server) RegisterRoutes(r *gin.Engine) {
 	r.GET("/health", s.handleHealth)
 
-	// Apply Auth Middleware
-	r.Use(authMiddleware())
-
 	// --- Config Management ---
 	r.Any("/config/*appName", s.handleConfig)
 
@@ -36,10 +33,6 @@ func (s *Server) RegisterRoutes(r *gin.Engine) {
 	r.POST("/apps/delete", s.handleDeleteApp)
 	r.GET("/apps/list", s.handleListApps)
 	r.GET("/apps/logs", s.handleAppLogs)
-
-	// --- Resource Provisioning ---
-	r.POST("/resources/provision", s.handleProvisionResource)
-	r.GET("/resources/list", s.handleListResources) // New
 
 	// --- Node Management ---
 	r.GET("/node/status", s.handleNodeStatus) // New
@@ -329,29 +322,6 @@ func (s *Server) handleAppLogs(c *gin.Context) {
 	c.JSON(http.StatusOK, api.Response{Success: true, Data: string(content)})
 }
 
-func (s *Server) handleProvisionResource(c *gin.Context) {
-	var req api.ProvisionRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, api.Response{Success: false, Message: "Invalid request body"})
-		return
-	}
-	config, err := manager.ProvisionResource(req)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, api.Response{Success: false, Message: err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, api.Response{Success: true, Message: "Resource provisioned", Data: config})
-}
-
-func (s *Server) handleListResources(c *gin.Context) {
-	resources, err := manager.ListResources()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, api.Response{Success: false, Message: err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, api.Response{Success: true, Data: resources})
-}
-
 func (s *Server) handleNodeStatus(c *gin.Context) {
 	node, err := manager.GetNodeStatus()
 	if err != nil {
@@ -359,38 +329,4 @@ func (s *Server) handleNodeStatus(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, api.Response{Success: true, Data: node})
-}
-
-func authMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		apiKey, err := configmanager.GetSystemConfig("api_key")
-		if err != nil {
-			c.AbortWithStatusJSON(http.StatusInternalServerError, api.Response{Success: false, Message: "Internal Server Error: Failed to retrieve API Key"})
-			return
-		}
-		if apiKey == "" {
-			c.AbortWithStatusJSON(http.StatusInternalServerError, api.Response{Success: false, Message: "Internal Server Error: API Key not configured"})
-			return
-		}
-
-		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, api.Response{Success: false, Message: "Unauthorized: Missing Authorization header"})
-			return
-		}
-
-		const prefix = "Bearer "
-		if len(authHeader) < len(prefix) || authHeader[:len(prefix)] != prefix {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, api.Response{Success: false, Message: "Unauthorized: Invalid Authorization header format"})
-			return
-		}
-
-		token := authHeader[len(prefix):]
-		if token != apiKey {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, api.Response{Success: false, Message: "Unauthorized: Invalid API Key"})
-			return
-		}
-
-		c.Next()
-	}
 }
