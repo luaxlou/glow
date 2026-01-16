@@ -1,6 +1,8 @@
 package appcenter
 
 import (
+	"encoding/json"
+	"fmt"
 	"net"
 	"sync"
 	"time"
@@ -66,4 +68,26 @@ func GetActiveApp(name string) (api.AppInfo, bool) {
 		return runtime.Info, true
 	}
 	return api.AppInfo{}, false
+}
+
+// SendConfigUpdate sends the new configuration to the connected application.
+func SendConfigUpdate(appName string, config map[string]any) error {
+	store.RLock()
+	runtime, ok := store.apps[appName]
+	store.RUnlock()
+
+	if !ok {
+		return fmt.Errorf("app %s not connected", appName)
+	}
+
+	resp := api.Response{
+		Success: true,
+		Data:    config,
+	}
+
+	// Create a new encoder to send the message
+	// Note: We assume single-writer safety here because the client
+	// on this connection is only listening (monitorConfig), so
+	// handleConnection on server is blocked on Read and won't Write.
+	return json.NewEncoder(runtime.Conn).Encode(resp)
 }

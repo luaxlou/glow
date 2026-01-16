@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/gin-gonic/gin"
+	"github.com/luaxlou/glow/internal/appcenter"
 	"github.com/luaxlou/glow/internal/configmanager"
 	"github.com/luaxlou/glow/internal/manager"
 	"github.com/luaxlou/glow/internal/statemanager"
@@ -171,6 +172,12 @@ func (s *Server) handleConfig(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, api.Response{Success: false, Message: "Failed to update config"})
 			return
 		}
+
+		// Notify AppCenter (Hot Reload)
+		if err := appcenter.SendConfigUpdate(appName, newConfig); err != nil {
+			fmt.Printf("Warning: failed to push config update to app %s: %v\n", appName, err)
+		}
+
 		c.JSON(http.StatusOK, api.Response{Success: true, Message: "Config updated"})
 		return
 	}
