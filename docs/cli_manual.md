@@ -24,6 +24,14 @@ glow context use local
 
 Glow CLI 的命令结构主要由“动词 + 资源”构成。
 
+### 应用部署 (Deployment)
+
+用于快速部署或更新本地应用二进制文件。
+
+*   **`glow deploy <binary_path>`**: 部署应用。
+    *   `glow deploy ./myapp`: 将本地二进制文件部署到服务器。如果服务器已有同名应用且二进制内容未变（Hash 校验），则跳过上传。
+    *   `glow deploy ./myapp --name my-custom-app`: 指定应用名称。
+
 ### 资源查看与描述 (Read-only)
 
 用于查看系统状态和资源详情。
@@ -52,11 +60,8 @@ Glow CLI 的命令结构主要由“动词 + 资源”构成。
     *   `glow delete app my-app`: 停止并移除应用。
     *   `glow delete ingress my-app`: 删除对应的路由规则。
 
-### 配置与声明式操作 (Configuration)
+### 配置管理 (Configuration)
 
-*   **`glow apply -f <filename>`**: 核心声明式命令。
-    *   支持应用 YAML/JSON 格式的 Manifest 文件，一次性部署或更新主机 (Host)、应用 (App)、配置 (Config) 及路由 (Ingress)。
-    
 *   **`glow config`**: 应用配置中心管理。
     *   `glow config view <app>`: 查看应用的当前 JSON 配置。
     *   `glow config edit <app>`: 调用系统编辑器（如 vim）交互式修改配置，保存后即热更新。
@@ -72,34 +77,7 @@ Glow CLI 的命令结构主要由“动词 + 资源”构成。
 
 ## 3. 常用场景示例
 
-### 场景一：部署一个新应用
-1. 编写 `app.yaml` 描述文件。
-2. 执行部署：
-   ```bash
-   glow apply -f app.yaml
-   ```
-3. 查看状态：
-   ```bash
-   glow get apps
-   ```
-
-### 场景二：暴露应用 (Ingress)
-1. 编写 `ingress.yaml`:
-   ```yaml
-   kind: Ingress
-   metadata:
-     name: my-app-ingress
-   spec:
-     domain: myapp.local
-     service: my-app
-     port: 8080
-   ```
-2. 应用配置：
-   ```bash
-   glow apply -f ingress.yaml
-   ```
-
-### 场景三：调试应用配置
+### 场景一：调试应用配置
 1. 查看当前配置：
    ```bash
    glow config view my-service
@@ -108,16 +86,12 @@ Glow CLI 的命令结构主要由“动词 + 资源”构成。
    ```bash
    glow config edit my-service
    ```
-   或者通过文件更新：
-   ```bash
-   glow apply -f config.yaml
-   ```
 3. 重启应用以确保某些静态配置生效（如果需要）：
    ```bash
    glow restart app my-service
    ```
 
-### 场景四：查看应用日志
+### 场景二：查看应用日志
 ```bash
 # 实时查看日志
 glow logs my-service

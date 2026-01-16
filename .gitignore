@@ -34,5 +34,5 @@ Thumbs.db
 glow.db
 *.log
 scripts/
-./glow
-./glow-server
+glow
+glow-server

@@ -47,6 +47,14 @@ type AppStatus struct {
 	Pid          int      `json:"pid,omitempty" yaml:"pid,omitempty"`
 	RestartCount int      `json:"restartCount,omitempty" yaml:"restartCount,omitempty"`
 	Stats        AppStats `json:"stats,omitempty" yaml:"stats,omitempty"`
+	ConfigHash   string   `json:"configHash,omitempty" yaml:"configHash,omitempty"`
+	BinaryHash   string   `json:"binaryHash,omitempty" yaml:"binaryHash,omitempty"`
+}
+
+// AppStateResponse represents the state hashes of an application
+type AppStateResponse struct {
+	ConfigHash string `json:"configHash"`
+	BinaryHash string `json:"binaryHash"`
 }
 
 // --- Node (Host) ---
@@ -146,6 +154,8 @@ type AppInfo struct {
 	Status       string            `json:"status"`
 	Pid          int               `json:"pid"`
 	Stats        AppStats          `json:"stats"`
+	ConfigHash   string            `json:"configHash,omitempty"`
+	BinaryHash   string            `json:"binaryHash,omitempty"`
 }
 
 type ProvisionRequest struct {
@@ -162,6 +172,40 @@ type IngressUpdateRequest struct {
 
 type IngressDeleteRequest struct {
 	AppName string `json:"app_name"`
+}
+
+// --- System Resource Configs ---
+
+// DatabaseInfo stores information about a database
+type DatabaseInfo struct {
+	Name    string `json:"name" yaml:"name"`
+	Charset string `json:"charset" yaml:"charset"`
+}
+
+// MySQLConfig stores the collected MySQL configuration
+type MySQLConfig struct {
+	Host      string         `json:"host" yaml:"host"`
+	Port      int            `json:"port" yaml:"port"`
+	User      string         `json:"user" yaml:"user"`
+	Password  string         `json:"password" yaml:"password"`
+	Databases []DatabaseInfo `json:"databases" yaml:"databases"`
+	UpdatedAt interface{}    `json:"updated_at" yaml:"updated_at"`
+}
+
+// RedisConfig stores the collected Redis configuration
+type RedisConfig struct {
+	Host      string      `json:"host" yaml:"host"`
+	Port      int         `json:"port" yaml:"port"`
+	Password  string      `json:"password" yaml:"password"`
+	UpdatedAt interface{} `json:"updated_at" yaml:"updated_at"`
+}
+
+// NginxSystemConfig stores the collected Nginx configuration
+type NginxSystemConfig struct {
+	BinaryPath string      `json:"binary_path" yaml:"binary_path"`
+	ConfPath   string      `json:"conf_path" yaml:"conf_path"`
+	Version    string      `json:"version" yaml:"version"`
+	UpdatedAt  interface{} `json:"updated_at" yaml:"updated_at"`
 }
 
 // Host Manifest (Old) - Keep for backward compatibility or refactor
@@ -191,6 +235,7 @@ type App struct {
 
 type AppSpecOld struct {
 	Binary       string                 `yaml:"binary" json:"binary"`
+	BinaryPath   string                 `yaml:"binaryPath,omitempty" json:"binaryPath,omitempty"` // Local path for upload
 	Command      string                 `yaml:"command" json:"command"`
 	Args         []string               `yaml:"args" json:"args"`
 	WorkingDir   string                 `yaml:"workingDir" json:"workingDir"`

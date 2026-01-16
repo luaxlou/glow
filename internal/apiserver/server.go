@@ -29,6 +29,7 @@ func (s *Server) RegisterRoutes(r *gin.Engine) {
 	r.Any("/config/*appName", s.handleConfig)
 
 	// --- App Management ---
+	r.POST("/apps/upload", s.handleUploadApp)
 	r.POST("/apps/start", s.handleStartApp)
 	r.POST("/apps/stop", s.handleStopApp)
 	r.POST("/apps/restart", s.handleRestartApp)
@@ -47,10 +48,6 @@ func (s *Server) RegisterRoutes(r *gin.Engine) {
 	r.POST("/ingress/update", s.handleUpdateIngress)
 	r.POST("/ingress/delete", s.handleDeleteIngress)
 	r.GET("/ingress/list", s.handleListIngress)
-
-	// --- Manifest Application ---
-	r.POST("/apply/host", s.handleApplyHost)
-	r.POST("/apply/app", s.handleApplyApp)
 }
 
 func (s *Server) handleHealth(c *gin.Context) {
@@ -185,6 +182,33 @@ func (s *Server) handleConfig(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusMethodNotAllowed, api.Response{Success: false, Message: "Method not allowed"})
+}
+
+func (s *Server) handleUploadApp(c *gin.Context) {
+	file, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, api.Response{Success: false, Message: "File required"})
+		return
+	}
+
+	dataDir, _ := configmanager.GetSystemConfig("data_dir")
+	if dataDir == "" {
+		dataDir = "."
+	}
+	tempDir := filepath.Join(dataDir, "tmp", "uploads")
+	if err := os.MkdirAll(tempDir, 0755); err != nil {
+		c.JSON(http.StatusInternalServerError, api.Response{Success: false, Message: "Failed to create temp dir"})
+		return
+	}
+
+	// Use original filename but safe
+	dst := filepath.Join(tempDir, filepath.Base(file.Filename))
+	if err := c.SaveUploadedFile(file, dst); err != nil {
+		c.JSON(http.StatusInternalServerError, api.Response{Success: false, Message: "Failed to save file"})
+		return
+	}
+
+	c.JSON(http.StatusOK, api.Response{Success: true, Data: dst})
 }
 
 func (s *Server) handleStartApp(c *gin.Context) {
@@ -335,32 +359,6 @@ func (s *Server) handleNodeStatus(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, api.Response{Success: true, Data: node})
-}
-
-func (s *Server) handleApplyHost(c *gin.Context) {
-	var hostReq api.Host
-	if err := c.ShouldBindJSON(&hostReq); err != nil {
-		c.JSON(http.StatusBadRequest, api.Response{Success: false, Message: "Invalid manifest"})
-		return
-	}
-	if err := configmanager.SaveHostConfig(hostReq); err != nil {
-		c.JSON(http.StatusInternalServerError, api.Response{Success: false, Message: "Failed to save host config"})
-		return
-	}
-	c.JSON(http.StatusOK, api.Response{Success: true, Message: "Host config applied"})
-}
-
-func (s *Server) handleApplyApp(c *gin.Context) {
-	var appReq api.App
-	if err := c.ShouldBindJSON(&appReq); err != nil {
-		c.JSON(http.StatusBadRequest, api.Response{Success: false, Message: "Invalid manifest"})
-		return
-	}
-	if err := manager.ApplyApp(appReq); err != nil {
-		c.JSON(http.StatusInternalServerError, api.Response{Success: false, Message: err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, api.Response{Success: true, Message: "App applied and started"})
 }
 
 func authMiddleware() gin.HandlerFunc {

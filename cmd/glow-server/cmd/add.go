@@ -12,41 +12,10 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/luaxlou/glow/internal/manager"
+	"github.com/luaxlou/glow/pkg/api"
 	"github.com/redis/go-redis/v9"
 	"github.com/spf13/cobra"
 )
-
-// DatabaseInfo stores information about a database
-type DatabaseInfo struct {
-	Name    string `json:"name"`
-	Charset string `json:"charset"`
-}
-
-// MySQLConfig stores the collected MySQL configuration
-type MySQLConfig struct {
-	Host      string         `json:"host"`
-	Port      int            `json:"port"`
-	User      string         `json:"user"`
-	Password  string         `json:"password"`
-	Databases []DatabaseInfo `json:"databases"`
-	UpdatedAt time.Time      `json:"updated_at"`
-}
-
-// RedisConfig stores the collected Redis configuration
-type RedisConfig struct {
-	Host      string    `json:"host"`
-	Port      int       `json:"port"`
-	Password  string    `json:"password"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
-// NginxSystemConfig stores the collected Nginx configuration
-type NginxSystemConfig struct {
-	BinaryPath string    `json:"binary_path"`
-	ConfPath   string    `json:"conf_path"`
-	Version    string    `json:"version"`
-	UpdatedAt  time.Time `json:"updated_at"`
-}
 
 var addCmd = &cobra.Command{
 	Use:   "add",
@@ -95,7 +64,7 @@ func runAddNginx(cmd *cobra.Command, args []string) {
 	fmt.Printf("  Access Log: %s\n", info.AccessLog)
 
 	// Save to system config
-	config := NginxSystemConfig{
+	config := api.NginxSystemConfig{
 		BinaryPath: info.BinaryPath,
 		ConfPath:   info.ConfPath,
 		Version:    info.Version,
@@ -119,7 +88,7 @@ func runAddRedis(cmd *cobra.Command, args []string) {
 	var err error
 
 	// 0. Check for existing config
-	var existingConfig RedisConfig
+	var existingConfig api.RedisConfig
 	if err := getSystemConfigJSON("redis_info", &existingConfig); err == nil && existingConfig.Host != "" {
 		fmt.Println("Found existing configuration. Trying to connect with stored credentials...")
 		rdb = redis.NewClient(&redis.Options{
@@ -184,7 +153,7 @@ func runAddRedis(cmd *cobra.Command, args []string) {
 	fmt.Println("Successfully connected to Redis.")
 
 	// 4. Save to system_configs
-	config := RedisConfig{
+	config := api.RedisConfig{
 		Host:      "127.0.0.1",
 		Port:      6379,
 		Password:  password,
@@ -208,7 +177,7 @@ func runAddMysql(cmd *cobra.Command, args []string) {
 	var err error
 
 	// 0. Check for existing config
-	var existingConfig MySQLConfig
+	var existingConfig api.MySQLConfig
 	if err := getSystemConfigJSON("mysql_info", &existingConfig); err == nil && existingConfig.Host != "" {
 		fmt.Println("Found existing configuration. Trying to connect with stored credentials...")
 		dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/", existingConfig.User, existingConfig.Password, existingConfig.Host, existingConfig.Port)
@@ -283,17 +252,17 @@ func runAddMysql(cmd *cobra.Command, args []string) {
 	}
 	defer rows.Close()
 
-	var dbs []DatabaseInfo
+	var dbs []api.DatabaseInfo
 	for rows.Next() {
 		var name, charset string
 		if err := rows.Scan(&name, &charset); err != nil {
 			fmt.Printf("Error scanning row: %v\n", err)
 			continue
 		}
-		dbs = append(dbs, DatabaseInfo{Name: name, Charset: charset})
+		dbs = append(dbs, api.DatabaseInfo{Name: name, Charset: charset})
 	}
 
-	config := MySQLConfig{
+	config := api.MySQLConfig{
 		Host:      "127.0.0.1",
 		Port:      3306,
 		User:      "root",

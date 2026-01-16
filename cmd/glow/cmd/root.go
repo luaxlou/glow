@@ -60,8 +60,7 @@ func Execute() {
 
 func init() {
 	home, _ := os.UserHomeDir()
-	defaultCfg := filepath.Join(home, ".glow.json")
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", defaultCfg, "config file (default is $HOME/.glow.json)")
+	cfgFile = filepath.Join(home, ".glow.json")
 }
 
 func ensureConfig() error {

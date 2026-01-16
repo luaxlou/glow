@@ -63,6 +63,7 @@ Auth: Header `Authorization: Bearer <API_KEY>`
 ### 应用管理
 | Method | Endpoint | Description | Payload |
 |--------|----------|-------------|---------|
+| POST | `/apps/upload` | 上传应用二进制 | Multipart Form: `file` |
 | POST | `/apps/start` | 启动应用 | `{ "name": "app1", "command": "./bin", "args": [], "port": 8080 }` |
 | POST | `/apps/stop` | 停止应用 | `{ "name": "app1" }` |
 | POST | `/apps/restart`| 重启应用 | `{ "name": "app1" }` |
@@ -87,12 +88,6 @@ Auth: Header `Authorization: Bearer <API_KEY>`
 | POST | `/ingress/update` | 更新/创建 Nginx 路由 | `{ "app_name": "app1", "domain": "app1.com", "port": 8080 }` |
 | POST | `/ingress/delete` | 删除 Nginx 路由 | `{ "app_name": "app1" }` |
 | GET | `/ingress/list` | 列出所有路由 | - |
-
-### 声明式部署 (Manifest)
-| Method | Endpoint | Description | Payload |
-|--------|----------|-------------|---------|
-| POST | `/apply/host` | 应用主机配置 | JSON of Host Manifest |
-| POST | `/apply/app` | 应用部署配置 | JSON of App Manifest |
 
 ## 4. 核心机制详解
 

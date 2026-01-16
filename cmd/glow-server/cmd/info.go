@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/luaxlou/glow/internal/configmanager"
+	"github.com/luaxlou/glow/pkg/api"
 	"github.com/spf13/cobra"
 )
 
@@ -34,7 +35,7 @@ func runInfo(cmd *cobra.Command, args []string) {
 	}
 
 	// 3. MySQL
-	var mysqlInfo MySQLConfig
+	var mysqlInfo api.MySQLConfig
 	if err := getSystemConfigJSON("mysql_info", &mysqlInfo); err == nil && mysqlInfo.Host != "" {
 		fmt.Printf("MySQL: %s:%d (User: %s, Databases: %d)\n", mysqlInfo.Host, mysqlInfo.Port, mysqlInfo.User, len(mysqlInfo.Databases))
 	} else {
@@ -42,7 +43,7 @@ func runInfo(cmd *cobra.Command, args []string) {
 	}
 
 	// 4. Redis
-	var redisInfo RedisConfig
+	var redisInfo api.RedisConfig
 	if err := getSystemConfigJSON("redis_info", &redisInfo); err == nil && redisInfo.Host != "" {
 		fmt.Printf("Redis: %s:%d\n", redisInfo.Host, redisInfo.Port)
 	} else {
@@ -50,7 +51,7 @@ func runInfo(cmd *cobra.Command, args []string) {
 	}
 
 	// 5. Nginx
-	var nginxInfo NginxSystemConfig
+	var nginxInfo api.NginxSystemConfig
 	if err := getSystemConfigJSON("nginx_info", &nginxInfo); err == nil && nginxInfo.BinaryPath != "" {
 		fmt.Printf("Nginx: %s (Version: %s)\n", nginxInfo.BinaryPath, nginxInfo.Version)
 	} else {

@@ -3,14 +3,6 @@
 ## Purpose
 自动化管理 Nginx 反向代理配置，动态生成虚拟主机（Server Block），实现从外部域名到本地应用端口的流量路由与负载均衡。
 ## Requirements
-### Requirement: Ingress 管理 (Ingress Management)
-The system MUST support declarative ingress management via `glow apply`.
-
-#### Scenario: Create Ingress (Manifest)
-- **WHEN** user executes `glow apply -f ingress.yaml`
-- **THEN** CLI creates the ingress rule
-- **NOTE** `glow create ingress` is removed in favor of this workflow.
-
 ### Requirement: 服务器自托管 (Server Self-Hosting)
 系统 MUST 支持通过 Nginx 将 glow-server 自身的 API 服务暴露到外部域名。
 

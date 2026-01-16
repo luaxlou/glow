@@ -1,6 +1,8 @@
 package manager
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"log"
@@ -26,62 +28,21 @@ var (
 	mu sync.RWMutex
 )
 
-func ApplyApp(manifest api.App) error {
-	req := api.StartAppRequest{
-		Name:        manifest.Metadata.Name,
-		Command:     manifest.Spec.Command,
-		Args:        manifest.Spec.Args,
-		WorkingDir:  manifest.Spec.WorkingDir,
-		AutoRestart: true,
-	}
-
-	if req.Command == "" {
-		req.Command = manifest.Spec.Binary
-	}
-
-	StopApp(req.Name)
-	if err := StartApp(req); err != nil {
-		return err
-	}
-
-	if manifest.Spec.Domain != "" {
-		dataDir, _ := configmanager.GetSystemConfig("data_dir")
-		if dataDir == "" {
-			dataDir = "."
-		}
-
-		app, err := statemanager.GetApp(req.Name)
-		if err != nil {
-			return fmt.Errorf("failed to get app after start: %w", err)
-		}
-
-		if err := GenerateNginxConfig(dataDir, NginxConfig{
-			Name:   req.Name,
-			Port:   app.Port,
-			Domain: manifest.Spec.Domain,
-		}); err != nil {
-			return err
-		}
-
-		app.Domain = manifest.Spec.Domain
-		statemanager.SaveApp(*app)
-	}
-
-	return nil
-}
-
 func ProvisionResource(req api.ProvisionRequest) (map[string]any, error) {
 	if req.ResourceType == "mysql" {
-		var hostCfg api.Host
-		if err := configmanager.GetHostConfig(&hostCfg); err != nil {
-			return nil, fmt.Errorf("host config not found: %w", err)
+		var mysqlConfig api.MySQLConfig
+		if err := configmanager.GetSystemConfigJSON("mysql_info", &mysqlConfig); err != nil {
+			return nil, fmt.Errorf("mysql info not found: %w", err)
 		}
-		mysqlSvc, ok := hostCfg.Spec.Services["mysql"]
-		if !ok {
-			return nil, fmt.Errorf("mysql service not defined")
+		if mysqlConfig.Host == "" {
+			return nil, fmt.Errorf("mysql service not configured")
 		}
 
-		p := provisioner.NewMySQL(mysqlSvc)
+		p := provisioner.NewMySQL(api.ServiceSpec{
+			Port:          mysqlConfig.Port,
+			AdminUser:     mysqlConfig.User,
+			AdminPassword: mysqlConfig.Password,
+		})
 		if err := p.Check(); err != nil {
 			return nil, fmt.Errorf("mysql check failed: %w", err)
 		}
@@ -93,7 +54,7 @@ func ProvisionResource(req api.ProvisionRequest) (map[string]any, error) {
 
 		configFragment := map[string]any{
 			"mysql": map[string]interface{}{
-				"dsn": fmt.Sprintf("%s:%s@tcp(127.0.0.1:%d)/%s?parseTime=true", user, pass, mysqlSvc.Port, req.ResourceName),
+				"dsn": fmt.Sprintf("%s:%s@tcp(127.0.0.1:%d)/%s?parseTime=true", user, pass, mysqlConfig.Port, req.ResourceName),
 			},
 		}
 
@@ -121,6 +82,9 @@ func StartApp(req api.StartAppRequest) error {
 
 	var existingRestartCount int
 	var existingDomain string
+	var existingConfigHash string
+	var existingBinaryHash string
+
 	if existingApp, err := statemanager.GetApp(req.Name); err == nil {
 		if existingApp.Status == "RUNNING" {
 			// Idempotent: return success if already running
@@ -130,6 +94,8 @@ func StartApp(req api.StartAppRequest) error {
 			existingRestartCount = existingApp.RestartCount
 		}
 		existingDomain = existingApp.Domain
+		existingConfigHash = existingApp.ConfigHash
+		existingBinaryHash = existingApp.BinaryHash
 	}
 
 	port, err := GetFreePort()
@@ -186,6 +152,12 @@ func StartApp(req api.StartAppRequest) error {
 		}
 	}
 
+	// Calculate Binary Hash
+	currentBinaryHash, err := calculateFileHash(dstBinaryPath)
+	if err == nil {
+		existingBinaryHash = currentBinaryHash
+	}
+
 	app := api.AppInfo{
 		Name:         req.Name,
 		Command:      dstBinaryPath,
@@ -197,6 +169,8 @@ func StartApp(req api.StartAppRequest) error {
 		AutoRestart:  req.AutoRestart,
 		RestartCount: existingRestartCount,
 		Status:       "STARTING",
+		ConfigHash:   existingConfigHash,
+		BinaryHash:   existingBinaryHash,
 	}
 
 	if app.WorkingDir == "" {
@@ -535,4 +509,19 @@ func copyFile(src, dst string) error {
 
 	_, err = io.Copy(out, in)
 	return err
+}
+
+func calculateFileHash(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(h.Sum(nil)), nil
 }

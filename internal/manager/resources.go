@@ -1,32 +1,41 @@
 package manager
 
 import (
-	"fmt"
-
 	"github.com/luaxlou/glow/internal/configmanager"
 	"github.com/luaxlou/glow/pkg/api"
 )
 
 func ListResources() ([]api.ResourceRef, error) {
-	var hostCfg api.Host
-	if err := configmanager.GetHostConfig(&hostCfg); err != nil {
-		// No host config implies no managed resources yet?
-		return []api.ResourceRef{}, nil
-	}
-
 	var resources []api.ResourceRef
-	for name, svc := range hostCfg.Spec.Services {
-		// Heuristic to determine Kind based on name or port?
-		// Host spec map key is name (e.g. "mysql").
-		// We treat key as Kind/Name combo?
-		// Usually name is "mysql", "redis".
-		kind := name // Simplified
-		
+
+	// Check MySQL
+	var mysqlConfig api.MySQLConfig
+	if err := configmanager.GetSystemConfigJSON("mysql_info", &mysqlConfig); err == nil && mysqlConfig.Host != "" {
 		resources = append(resources, api.ResourceRef{
-			Kind: kind,
-			Name: fmt.Sprintf("%s-local", kind), // local instance
-			Port: svc.Port,
+			Kind: "mysql",
+			Name: "mysql-local",
+			Port: mysqlConfig.Port,
 		})
 	}
+
+	// Check Redis
+	var redisConfig api.RedisConfig
+	if err := configmanager.GetSystemConfigJSON("redis_info", &redisConfig); err == nil && redisConfig.Host != "" {
+		resources = append(resources, api.ResourceRef{
+			Kind: "redis",
+			Name: "redis-local",
+			Port: redisConfig.Port,
+		})
+	}
+
+	// Check Nginx
+	var nginxConfig api.NginxSystemConfig
+	if err := configmanager.GetSystemConfigJSON("nginx_info", &nginxConfig); err == nil && nginxConfig.BinaryPath != "" {
+		resources = append(resources, api.ResourceRef{
+			Kind: "nginx",
+			Name: "nginx-system",
+		})
+	}
+
 	return resources, nil
 }

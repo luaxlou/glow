@@ -63,11 +63,3 @@ func SetSystemConfigJSON(key string, v interface{}) error {
 	}
 	return SetSystemConfig(key, string(b))
 }
-
-func GetHostConfig(v interface{}) error {
-	return GetSystemConfigJSON("host_config", v)
-}
-
-func SaveHostConfig(v interface{}) error {
-	return SetSystemConfigJSON("host_config", v)
-}

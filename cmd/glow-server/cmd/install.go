@@ -8,6 +8,7 @@ import (
 
 	"github.com/luaxlou/glow/internal/configmanager"
 	"github.com/luaxlou/glow/internal/manager"
+	"github.com/luaxlou/glow/pkg/api"
 	"github.com/spf13/cobra"
 )
 
@@ -127,7 +128,7 @@ func stepService(reader *bufio.Reader) error {
 }
 
 func stepIngress(reader *bufio.Reader) error {
-	var nginxInfo NginxSystemConfig
+	var nginxInfo api.NginxSystemConfig
 	err := getSystemConfigJSON("nginx_info", &nginxInfo)
 	if err != nil || nginxInfo.BinaryPath == "" {
 		// Nginx not configured, skip

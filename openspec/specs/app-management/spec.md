@@ -96,3 +96,19 @@
 - **WHEN** 用户执行 `glow logs <name>`
 - **THEN** CLI 应获取并打印日志（支持 -f 实时流式传输）
 
+### Requirement: Application State Validation
+The system MUST provide an endpoint to query the configuration and binary state of a deployed application.
+
+#### Scenario: Get App State
+- **GIVEN** an application "my-app" is deployed
+- **WHEN** the client sends `GET /apps/my-app/state`
+- **THEN** the server MUST return a JSON object containing the current `configHash` and `binaryHash`.
+
+### Requirement: Application Binary Upload
+The system MUST provide an endpoint for clients to upload application binaries.
+
+#### Scenario: Upload a New Binary
+- **WHEN** the client sends a `POST` request to `/apps/my-app/binary` with a multipart/form-data payload containing the binary file
+- **THEN** the server MUST securely save the binary to a managed location.
+- **AND** the server MUST update the application's stored `binaryHash`.
+
