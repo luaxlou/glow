@@ -99,6 +99,16 @@ func runDeploy(cmd *cobra.Command, args []string) {
 		req.WorkingDir = existingApp.WorkingDir
 		req.AutoRestart = existingApp.AutoRestart
 		req.Config = existingApp.Config
+
+		// Stop the app first to ensure restart with new binary
+		if existingApp.Status == "RUNNING" {
+			fmt.Printf("Stopping app '%s' for update...\n", name)
+			var stopResp api.Response
+			stopReq := api.StopAppRequest{Name: name}
+			if err := request("POST", "/apps/stop", stopReq, &stopResp); err != nil {
+				fmt.Printf("Warning: Failed to stop app: %v\n", err)
+			}
+		}
 	}
 
 	var startResp api.Response

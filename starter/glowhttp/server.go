@@ -56,12 +56,15 @@ func Run() {
 		Router()
 	}
 
+	// Priority: OP_APP_PORT > Init() Port > PORT > 8080
+	// 1. Check override from Glow Server (OP_APP_PORT)
+	if p := os.Getenv("OP_APP_PORT"); p != "" {
+		port = ":" + p
+	}
+
+	// 2. If no override and no Init() port, check standard PORT env or default
 	if port == "" {
-		// Priority: OP_APP_PORT > PORT > 8080
-		p := os.Getenv("OP_APP_PORT")
-		if p == "" {
-			p = os.Getenv("PORT")
-		}
+		p := os.Getenv("PORT")
 		if p == "" {
 			p = "8080"
 		}
