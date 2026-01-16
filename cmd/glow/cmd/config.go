@@ -35,43 +35,6 @@ var viewConfigCmd = &cobra.Command{
 	},
 }
 
-var applyConfigCmd = &cobra.Command{
-	Use:   "apply <app>",
-	Short: "Apply configuration from file",
-	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		appName := args[0]
-		file, _ := cmd.Flags().GetString("file")
-		if file == "" {
-			fmt.Println("Error: --file is required")
-			return
-		}
-
-		content, err := os.ReadFile(file)
-		if err != nil {
-			fmt.Printf("Error reading file: %v\n", err)
-			return
-		}
-
-		var configData map[string]any
-		if err := json.Unmarshal(content, &configData); err != nil {
-			fmt.Printf("Error parsing JSON: %v\n", err)
-			return
-		}
-
-		var resp api.Response
-		if err := request("PUT", "/config/"+appName, configData, &resp); err != nil {
-			fmt.Printf("Error: %v\n", err)
-			return
-		}
-		if resp.Success {
-			fmt.Printf("Config for %s updated\n", appName)
-		} else {
-			fmt.Printf("Error: %s\n", resp.Message)
-		}
-	},
-}
-
 var editConfigCmd = &cobra.Command{
 	Use:   "edit <app>",
 	Short: "Edit configuration interactively",
@@ -141,8 +104,5 @@ var editConfigCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(configCmd)
 	configCmd.AddCommand(viewConfigCmd)
-	configCmd.AddCommand(applyConfigCmd)
 	configCmd.AddCommand(editConfigCmd)
-
-	applyConfigCmd.Flags().StringP("file", "f", "", "JSON config file")
 }

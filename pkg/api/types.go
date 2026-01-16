@@ -89,6 +89,14 @@ type IngressSpec struct {
 	Port    int    `json:"port" yaml:"port"`
 }
 
+// --- Config ---
+
+type Config struct {
+	TypeMeta   `json:",inline" yaml:",inline"`
+	ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+	Data       map[string]any `json:"data,omitempty" yaml:"data,omitempty"`
+}
+
 // --- Legacy & Shared Types ---
 
 type AppStats struct {

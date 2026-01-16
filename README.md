@@ -123,6 +123,7 @@ go run main.go
 ## 📚 文档 (Documentation)
 
 *   [Glow Server 用户手册](docs/server_manual.md): 详细介绍了 CLI 命令、API 接口与核心运行机制。
+*   [Glow CLI 用户手册](docs/cli_manual.md): 命令行工具 `glow` 的详细使用说明。
 *   [Glow SDK 用户手册](docs/sdk_manual.md): 指导开发者如何使用 Glow SDK (Starter) 编写应用。
 
 ## 为什么叫 Glow？

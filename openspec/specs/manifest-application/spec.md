@@ -15,3 +15,17 @@
 - `Node`: 定义宿主机基础设施（数据库服务、端口池等）
 - `App`: 定义应用及其配置（Command, Env, Replicas, Ingress）
 
+### Requirement: Config Resource Support
+The system MUST support the `Config` kind in manifests to manage application configuration.
+
+#### Scenario: Apply Config
+- **WHEN** user executes `glow apply -f config.yaml` with `kind: Config`
+- **THEN** CLI updates the application configuration via the API
+
+### Requirement: Ingress Resource Support
+The system MUST support the `Ingress` kind in manifests to manage ingress rules.
+
+#### Scenario: Apply Ingress
+- **WHEN** user executes `glow apply -f ingress.yaml` with `kind: Ingress`
+- **THEN** CLI creates or updates the ingress rule via the API
+

@@ -4,17 +4,19 @@
 自动化管理 Nginx 反向代理配置，动态生成虚拟主机（Server Block），实现从外部域名到本地应用端口的流量路由与负载均衡。
 ## Requirements
 ### Requirement: Ingress 管理 (Ingress Management)
-系统 MUST 提供类 K8s 的 Ingress 资源管理接口。
+The system MUST support declarative ingress management via `glow apply`.
 
-#### Scenario: 创建 Ingress
-- **WHEN** 用户执行 `glow create ingress <name> --domain <domain> --service <app_name>`
-- **THEN** CLI 应发送创建请求
+#### Scenario: Create Ingress (Manifest)
+- **WHEN** user executes `glow apply -f ingress.yaml`
+- **THEN** CLI creates the ingress rule
+- **NOTE** `glow create ingress` is removed in favor of this workflow.
 
-#### Scenario: 获取 Ingress 列表
-- **WHEN** 用户执行 `glow get ingress`
-- **THEN** CLI 应列出 Ingress 资源（NAME, HOST, SERVICE, PORT）
+### Requirement: 服务器自托管 (Server Self-Hosting)
+系统 MUST 支持通过 Nginx 将 glow-server 自身的 API 服务暴露到外部域名。
 
-#### Scenario: 删除 Ingress
-- **WHEN** 用户执行 `glow delete ingress <name>`
-- **THEN** CLI 应发送删除请求
+#### Scenario: 配置反向代理
+- **WHEN** 用户在 `install` 流程中选择配置 glow-server 域名（例如 `glow.example.com`）
+- **THEN** 系统应生成 Nginx 配置文件，将该域名流量转发到 `glow-server` 的监听端口
+- **AND** 重载 Nginx 使配置生效
+- **AND** 后续 `info` 命令应显示该外部访问地址
 

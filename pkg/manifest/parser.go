@@ -41,6 +41,18 @@ func Parse(data []byte) ([]interface{}, error) {
 				return nil, err
 			}
 			docs = append(docs, app)
+		case "Ingress":
+			var ingress api.Ingress
+			if err := node.Decode(&ingress); err != nil {
+				return nil, err
+			}
+			docs = append(docs, ingress)
+		case "Config":
+			var config api.Config
+			if err := node.Decode(&config); err != nil {
+				return nil, err
+			}
+			docs = append(docs, config)
 		default:
 			// skip or error?
 		}
