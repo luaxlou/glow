@@ -192,8 +192,7 @@ func applyConfig(data any) {
 	}
 }
 
-// ProvisionResource requests the server to provision a resource.
-func ProvisionResource(kind string, name string) (map[string]any, error) {
+func ProvisionResource(resourceType, resourceName string) (map[string]any, error) {
 	serverAddr := os.Getenv(EnvServerURL)
 	if serverAddr == "" {
 		serverAddr = "127.0.0.1:32101"
@@ -201,22 +200,35 @@ func ProvisionResource(kind string, name string) (map[string]any, error) {
 	serverAddr = strings.TrimPrefix(serverAddr, "http://")
 	serverAddr = strings.TrimPrefix(serverAddr, "tcp://")
 
+	appName := os.Getenv(EnvAppName)
+	if appName == "" {
+		appName = AppIdentity
+	}
+
+	if appName == "" {
+		return nil, fmt.Errorf("OpServer connection info missing")
+	}
+
 	conn, err := net.DialTimeout("tcp", serverAddr, 2*time.Second)
 	if err != nil {
 		return nil, err
 	}
 	defer conn.Close()
 
-	payload, _ := json.Marshal(map[string]string{
-		"kind": kind,
-		"name": name,
-	})
+	reqBody := api.ProvisionRequest{
+		AppName:      appName,
+		ResourceType: resourceType,
+		ResourceName: resourceName,
+	}
 
+	payload, _ := json.Marshal(reqBody)
 	req := api.TCPRequest{
 		Action:  api.ActionProvision,
-		AppName: AppIdentity,
+		AppName: appName,
 		Payload: payload,
 	}
+
+	verboseLog("Provisioning resource: %s/%s", resourceType, resourceName)
 
 	if err := json.NewEncoder(conn).Encode(req); err != nil {
 		return nil, err
@@ -232,12 +244,25 @@ func ProvisionResource(kind string, name string) (map[string]any, error) {
 		return nil, fmt.Errorf("server error: %s", resp.Message)
 	}
 
-	// Response Data should be the resource config map
-	if data, ok := resp.Data.(map[string]any); ok {
-		return data, nil
+	dataBytes, _ := json.Marshal(resp.Data)
+	if v == nil {
+		v = viper.New()
 	}
-	
-	return nil, fmt.Errorf("invalid response data format")
+	v.SetConfigType("json")
+	if err := v.MergeConfig(bytes.NewReader(dataBytes)); err != nil {
+		return nil, err
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(dataBytes, &result); err != nil {
+		return nil, err
+	}
+
+	if checkVerbose() {
+		verboseLog("Provisioned Resource Config: %+v", result)
+	}
+
+	return result, nil
 }
 
 // Register is deprecated, use Start instead. Kept for backward compatibility if needed,
