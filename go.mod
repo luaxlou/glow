@@ -12,6 +12,8 @@ require (
 	github.com/spf13/viper v1.21.0
 	golang.org/x/crypto v0.46.0
 	gopkg.in/yaml.v3 v3.0.1
+	gorm.io/driver/mysql v1.6.0
+	gorm.io/gorm v1.31.1
 	modernc.org/sqlite v1.42.2
 )
 
@@ -36,6 +38,8 @@ require (
 	github.com/goccy/go-yaml v1.19.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
+	github.com/jinzhu/inflection v1.0.0 // indirect
+	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect

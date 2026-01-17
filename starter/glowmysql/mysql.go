@@ -6,12 +6,14 @@ import (
 	"log"
 	"sync"
 
-	_ "github.com/go-sql-driver/mysql"
 	"github.com/luaxlou/glow/starter/glowapp"
 	"github.com/luaxlou/glow/starter/glowapp/config"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
 )
 
 var (
+	gdb         *gorm.DB
 	db          *sql.DB
 	initialized bool
 	mu          sync.RWMutex
@@ -22,23 +24,19 @@ func Init(name string) {
 	dbName = name
 }
 
-// DB returns a singleton MySQL connection.
-// It initializes the connection on the first call using the configuration
-// associated with the current AppIdentity.
-func DB() (*sql.DB, error) {
+func Gorm() (*gorm.DB, error) {
 	mu.RLock()
-	if initialized && db != nil {
+	if initialized && gdb != nil {
 		defer mu.RUnlock()
-		return db, nil
+		return gdb, nil
 	}
 	mu.RUnlock()
 
 	mu.Lock()
 	defer mu.Unlock()
 
-	// Double check
-	if initialized && db != nil {
-		return db, nil
+	if initialized && gdb != nil {
+		return gdb, nil
 	}
 
 	appName := config.AppIdentity
@@ -52,7 +50,6 @@ func DB() (*sql.DB, error) {
 
 	log.Printf("Lazy initializing MySQL Starter for %s (db: %s)...", appName, dbName)
 
-	// This calls into sdk/config, which uses the registered AppIdentity
 	cfg, err := config.ProvisionResource("mysql", dbName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to provision mysql: %w", err)
@@ -69,16 +66,22 @@ func DB() (*sql.DB, error) {
 		return nil, fmt.Errorf("dsn not found in mysql config")
 	}
 
-	conn, err := sql.Open("mysql", dsn)
+	conn, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to open mysql connection: %w", err)
+		return nil, fmt.Errorf("failed to open mysql connection via gorm: %w", err)
 	}
 
-	if err := conn.Ping(); err != nil {
+	sqlDB, err := conn.DB()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get mysql sql.DB: %w", err)
+	}
+
+	if err := sqlDB.Ping(); err != nil {
 		return nil, fmt.Errorf("failed to ping mysql: %w", err)
 	}
 
-	db = conn
+	gdb = conn
+	db = sqlDB
 	initialized = true
 	log.Println("MySQL Starter initialized successfully.")
 
@@ -89,11 +92,29 @@ func DB() (*sql.DB, error) {
 		}
 	})
 
-	return db, nil
+	return gdb, nil
 }
 
-// Reload forces re-initialization of the MySQL connection.
-// This can be called when configuration updates are received.
+func DB() (*sql.DB, error) {
+	mu.RLock()
+	if initialized && db != nil {
+		defer mu.RUnlock()
+		return db, nil
+	}
+	mu.RUnlock()
+
+	conn, err := Gorm()
+	if err != nil {
+		return nil, err
+	}
+
+	sqlDB, err := conn.DB()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get mysql sql.DB: %w", err)
+	}
+	return sqlDB, nil
+}
+
 func Reload() {
 	mu.Lock()
 	defer mu.Unlock()
@@ -102,6 +123,7 @@ func Reload() {
 		db.Close()
 		db = nil
 	}
+	gdb = nil
 	initialized = false
 	log.Println("MySQL Starter reset for re-initialization.")
 }

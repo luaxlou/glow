@@ -70,6 +70,49 @@ Glow SDK 提供了一系列标准化的 Starter 组件。
 *   **Get(key string, target interface{})**: 获取配置项。
 *   **动态更新**: 当在 Server 端修改配置时，SDK 会通过 TCP 长连接收到推送，并自动更新内存中的配置。
 
+### 3.4 GlowMySQL (数据库 - 基于 GORM)
+
+`glowmysql` 提供了与 Glow Server 打通的 MySQL 访问能力，底层基于 [GORM](https://gorm.io)。
+
+*   **Init(dbName string)**: 声明应用希望使用的数据库名。首次访问会触发 Glow Server 的资源申请/创建逻辑。
+*   **Gorm() (*gorm.DB, error)**: 返回单例的 `*gorm.DB`，用于日常业务开发。
+*   **DB() (*sql.DB, error)**: 在需要原生 `*sql.DB` 的场景下使用，内部复用同一连接。
+
+示例：
+
+```go
+import (
+    "log"
+
+    "github.com/luaxlou/glow/starter/glowapp"
+    "github.com/luaxlou/glow/starter/glowhttp"
+    "github.com/luaxlou/glow/starter/glowmysql"
+)
+
+func main() {
+    glowapp.Init("my-gorm-app")
+
+    glowhttp.Init(8080)
+    glowmysql.Init("my_gorm_app_db")
+
+    db, err := glowmysql.Gorm()
+    if err != nil {
+        log.Fatalf("init mysql via gorm failed: %v", err)
+    }
+
+    type User struct {
+        ID   uint
+        Name string
+    }
+
+    if err := db.AutoMigrate(&User{}); err != nil {
+        log.Fatalf("auto migrate failed: %v", err)
+    }
+
+    // 继续使用 db 进行 CRUD ...
+}
+```
+
 ## 4. 运行机制
 
 ### 4.1 本地调试 vs 托管运行

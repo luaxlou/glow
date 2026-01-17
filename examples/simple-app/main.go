@@ -23,13 +23,15 @@ func main() {
 
 	// 2. Implicit wiring: usage triggers configuration & connection
 	// The MySQL component calls config, which calls app (identity) to resolve configuration.
-	db, err := glowmysql.DB()
+	db, err := glowmysql.Gorm()
 	if err != nil {
 		log.Printf("Warning: MySQL not available: %v. Running without DB.", err)
 	} else {
 		fmt.Println("MySQL is ready and connected!")
-		// Verify connection
-		if err := db.Ping(); err != nil {
+		sqlDB, err := db.DB()
+		if err != nil {
+			log.Printf("Failed to get sql.DB: %v", err)
+		} else if err := sqlDB.Ping(); err != nil {
 			log.Printf("Failed to ping DB: %v", err)
 		}
 	}
