@@ -27,6 +27,10 @@ var (
 	mu sync.RWMutex
 )
 
+type StopAppOptions struct {
+	KeepIngress bool
+}
+
 func StartApp(req api.StartAppRequest) error {
 	mu.Lock()
 	defer mu.Unlock()
@@ -82,7 +86,13 @@ func StartApp(req api.StartAppRequest) error {
 		}
 	}
 
-	port, err := GetFreePort()
+	port := 0
+	var err error
+	if existingApp != nil && existingApp.Port != 0 {
+		port = existingApp.Port
+	} else {
+		port, err = GetFreePort()
+	}
 	// Optional port allocation: if not specified in config, try to allocate
 	// But spec says "Make port allocation optional (read from config)".
 	// If OP_APP_PORT env or config exists, use it?
@@ -102,6 +112,12 @@ func StartApp(req api.StartAppRequest) error {
 		}
 	}
 
+	if port == 0 {
+		if err != nil {
+			return fmt.Errorf("failed to assign port: %w", err)
+		}
+		return fmt.Errorf("failed to assign port")
+	}
 	if err != nil {
 		return fmt.Errorf("failed to assign port: %w", err)
 	}
@@ -199,12 +215,14 @@ func StartApp(req api.StartAppRequest) error {
 		app.WorkingDir = appDir
 	}
 
-	if err := GenerateNginxConfig(dataDir, NginxConfig{
-		Name:   app.Name,
-		Port:   app.Port,
-		Domain: app.Domain,
-	}); err != nil {
-		fmt.Printf("Warning: Failed to generate nginx config: %v\n", err)
+	if !req.SkipIngress {
+		if err := GenerateNginxConfig(dataDir, NginxConfig{
+			Name:   app.Name,
+			Port:   app.Port,
+			Domain: app.Domain,
+		}); err != nil {
+			fmt.Printf("Warning: Failed to generate nginx config: %v\n", err)
+		}
 	}
 
 	cmd := exec.Command(app.Command, app.Args...)
@@ -318,6 +336,10 @@ func ListResources() ([]api.ResourceRef, error) {
 }
 
 func StopApp(name string) error {
+	return StopAppWithOptions(name, StopAppOptions{})
+}
+
+func StopAppWithOptions(name string, opts StopAppOptions) error {
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -347,7 +369,9 @@ func StopApp(name string) error {
 
 	app.Status = "STOPPED"
 	app.Pid = 0
-	RemoveNginxConfig(dataDir, name)
+	if !opts.KeepIngress {
+		RemoveNginxConfig(dataDir, name)
+	}
 	return statemanager.SaveApp(*app)
 }
 

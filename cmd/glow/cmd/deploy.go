@@ -88,8 +88,9 @@ func runDeploy(cmd *cobra.Command, args []string) {
 
 	// 4. Start/Update App
 	req := api.StartAppRequest{
-		Name:    name,
-		Command: uploadedPath,
+		Name:        name,
+		Command:     uploadedPath,
+		SkipIngress: true,
 	}
 
 	// Preserve existing config/env if updating
@@ -104,7 +105,7 @@ func runDeploy(cmd *cobra.Command, args []string) {
 		if existingApp.Status == "RUNNING" {
 			fmt.Printf("Stopping app '%s' for update...\n", name)
 			var stopResp api.Response
-			stopReq := api.StopAppRequest{Name: name}
+			stopReq := api.StopAppRequest{Name: name, KeepIngress: true}
 			if err := request("POST", "/apps/stop", stopReq, &stopResp); err != nil {
 				fmt.Printf("Warning: Failed to stop app: %v\n", err)
 			}

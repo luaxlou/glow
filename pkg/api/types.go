@@ -131,11 +131,13 @@ type StartAppRequest struct {
 	Config      map[string]any    `json:"config"`
 	Domain      string            `json:"domain"`
 	AutoRestart bool              `json:"auto_restart"`
+	SkipIngress bool              `json:"skip_ingress,omitempty"`
 }
 
 // Deprecated: StopAppRequest
 type StopAppRequest struct {
-	Name string `json:"name"`
+	Name       string `json:"name"`
+	KeepIngress bool   `json:"keep_ingress,omitempty"`
 }
 
 // Deprecated: AppInfo (Use Deployment.Status instead)

@@ -182,3 +182,57 @@ done
 		t.Fatalf("StopApp failed: %v", err)
 	}
 }
+
+func TestAppManager_StopApp_KeepIngressDoesNotRemoveConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Cleanup(func() { _ = os.Remove("glow.db") })
+
+	glowsqlite.Reload()
+
+	if err := configmanager.EnsureInitialized(); err != nil {
+		t.Fatalf("Failed to init config manager: %v", err)
+	}
+	configmanager.SetSystemConfig("data_dir", tmpDir)
+	configmanager.SetSystemConfig("api_key", "test-key")
+	configmanager.SetSystemConfig("server_url", "127.0.0.1:8080")
+
+	dummySrc := filepath.Join(tmpDir, "dummy_app_keep_ingress")
+	scriptContent := `#!/bin/sh
+echo "Starting dummy app"
+while true; do
+  echo "running"
+  sleep 1
+done
+`
+	if err := os.WriteFile(dummySrc, []byte(scriptContent), 0755); err != nil {
+		t.Fatalf("Failed to create dummy app: %v", err)
+	}
+
+	appName := "keep-ingress-test-app"
+	_ = statemanager.DeleteApp(appName)
+	if err := statemanager.SaveApp(api.AppInfo{
+		Name:   appName,
+		Status: "STOPPED",
+		Domain: "keep.example.com",
+		Port:   18080,
+	}); err != nil {
+		t.Fatalf("Failed to seed app state: %v", err)
+	}
+
+	if err := StartApp(api.StartAppRequest{Name: appName, Command: dummySrc}); err != nil {
+		t.Fatalf("StartApp failed: %v", err)
+	}
+
+	confFile := filepath.Join(tmpDir, "nginx", appName+".conf")
+	if _, err := os.Stat(confFile); os.IsNotExist(err) {
+		t.Fatalf("Nginx config file not created")
+	}
+
+	if err := StopAppWithOptions(appName, StopAppOptions{KeepIngress: true}); err != nil {
+		t.Fatalf("StopAppWithOptions failed: %v", err)
+	}
+
+	if _, err := os.Stat(confFile); os.IsNotExist(err) {
+		t.Fatalf("Nginx config file removed unexpectedly")
+	}
+}

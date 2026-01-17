@@ -237,7 +237,7 @@ func (s *Server) handleStopApp(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, api.Response{Success: false, Message: "Invalid request body"})
 		return
 	}
-	if err := manager.StopApp(req.Name); err != nil {
+	if err := manager.StopAppWithOptions(req.Name, manager.StopAppOptions{KeepIngress: req.KeepIngress}); err != nil {
 		c.JSON(http.StatusInternalServerError, api.Response{Success: false, Message: err.Error()})
 		return
 	}
