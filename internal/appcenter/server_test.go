@@ -9,16 +9,16 @@ import (
 
 func TestMergeAppInfo_PreservesCommandWhenIncomingIsPartial(t *testing.T) {
 	existing := api.AppInfo{
-		Name:       "four-server",
-		Command:    "/data/apps/four-server/glow_four-server",
-		WorkingDir: "/data/apps/four-server",
-		Env:        map[string]string{"A": "B"},
-		Args:       []string{"--x", "1"},
+		Name:        "four-server",
+		Command:     "/data/apps/four-server/glow_four-server",
+		WorkingDir:  "/data/apps/four-server",
+		Env:         map[string]string{"A": "B"},
+		Args:        []string{"--x", "1"},
 		AutoRestart: true,
-		Domain:     "example.com",
-		Status:     "RUNNING",
-		Port:       1234,
-		Pid:        999,
+		Domain:      "example.com",
+		Status:      "RUNNING",
+		Port:        1234,
+		Pid:         999,
 	}
 
 	// Simulate the common case: app reports only runtime fields, omitting Command.
@@ -75,4 +75,3 @@ func TestEnrichAppInfoFromPID_FillsCommandForLegacyClients(t *testing.T) {
 		t.Fatalf("expected Command to be inferred from PID, got empty")
 	}
 }
-

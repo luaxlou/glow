@@ -17,11 +17,11 @@ var getNodeCmd = &cobra.Command{
 			fmt.Printf("Error: %v\n", err)
 			return
 		}
-		
+
 		// Handle list or single object
 		data, _ := json.Marshal(resp.Data)
 		var nodes []api.Node
-		
+
 		// Try to unmarshal as list
 		if err := json.Unmarshal(data, &nodes); err != nil {
 			// Try as single object
@@ -65,18 +65,18 @@ var describeNodeCmd = &cobra.Command{
 			json.Unmarshal(data, &node)
 			nodes = append(nodes, node)
 		}
-		
+
 		// If name arg present, find it
 		targetName := ""
 		if len(args) > 0 {
 			targetName = args[0]
 		}
-		
+
 		for _, node := range nodes {
 			if targetName != "" && node.Name != targetName && node.Status.Hostname != targetName {
 				continue
 			}
-			
+
 			fmt.Printf("Name:     %s\n", node.Name)
 			fmt.Printf("Hostname: %s\n", node.Status.Hostname)
 			fmt.Printf("OS/Arch:  %s/%s\n", node.Status.OS, node.Status.Arch)
@@ -85,7 +85,7 @@ var describeNodeCmd = &cobra.Command{
 			fmt.Printf("  CPU Usage:    %.2f%%\n", node.Status.CPUUsage)
 			fmt.Printf("  Mem Usage:    %.2f%%\n", node.Status.MemUsage)
 			fmt.Printf("  Disk Usage:   %.2f%%\n", node.Status.DiskUsage)
-			
+
 			if len(node.Status.Resources) > 0 {
 				fmt.Println("Managed Resources:")
 				for _, res := range node.Status.Resources {

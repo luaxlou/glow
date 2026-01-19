@@ -304,7 +304,7 @@ func (s *Server) handleRestartApp(c *gin.Context) {
 		}
 		appDir := filepath.Join(dataDir, "apps", targetApp.Name)
 		dstBinaryPath := filepath.Join(appDir, "glow_"+targetApp.Name)
-		
+
 		// Check if deployed binary exists
 		if _, err := os.Stat(dstBinaryPath); err == nil {
 			targetApp.Command = dstBinaryPath

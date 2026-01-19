@@ -73,9 +73,9 @@ func DetectNginx() (*NginxInfo, error) {
 	if err != nil {
 		return info, fmt.Errorf("failed to run nginx -V: %v", err)
 	}
-	
+
 	output := string(out)
-	
+
 	// Parse Version
 	if matches := regexp.MustCompile(`nginx version: nginx/([\d.]+)`).FindStringSubmatch(output); len(matches) > 1 {
 		info.Version = matches[1]
@@ -94,7 +94,7 @@ func DetectNginx() (*NginxInfo, error) {
 			info.PrefixPath = strings.TrimPrefix(arg, "--prefix=")
 		}
 	}
-	
+
 	return info, nil
 }
 
@@ -128,7 +128,7 @@ func GenerateNginxConfig(dataDir string, cfg NginxConfig) error {
 	if err != nil {
 		return err
 	}
-	
+
 	if err := tmpl.Execute(f, cfg); err != nil {
 		f.Close()
 		return err
@@ -138,14 +138,14 @@ func GenerateNginxConfig(dataDir string, cfg NginxConfig) error {
 	// 3. Link or Copy to Nginx Config Directory (if detected)
 	if info != nil && info.ConfPath != "" {
 		confDir := filepath.Dir(info.ConfPath)
-		
+
 		// Common include directories
 		candidates := []string{
 			filepath.Join(confDir, "servers"),       // macOS Homebrew common
 			filepath.Join(confDir, "conf.d"),        // Linux common
 			filepath.Join(confDir, "sites-enabled"), // Debian/Ubuntu
 		}
-		
+
 		var targetDir string
 		for _, dir := range candidates {
 			if s, err := os.Stat(dir); err == nil && s.IsDir() {
@@ -153,11 +153,11 @@ func GenerateNginxConfig(dataDir string, cfg NginxConfig) error {
 				break
 			}
 		}
-		
+
 		if targetDir != "" {
 			targetFile := filepath.Join(targetDir, cfg.Name+".conf")
 			log.Printf("Installing Nginx config to: %s", targetFile)
-			
+
 			// Copy file content
 			input, err := os.ReadFile(fileName)
 			if err != nil {
@@ -217,7 +217,7 @@ func GetIngress(dataDir string, name string) (*NginxConfig, error) {
 	}
 
 	cfg := &NginxConfig{Name: name}
-	
+
 	// Simple parsing from file content (upstream and server_name)
 	// Upstream: server 127.0.0.1:PORT;
 	rePort := regexp.MustCompile(`server 127.0.0.1:(\d+);`)
@@ -238,7 +238,7 @@ func RemoveNginxConfig(dataDir string, name string) error {
 	// Remove local
 	fileName := filepath.Join(dataDir, "nginx", name+".conf")
 	os.Remove(fileName)
-	
+
 	// Remove system (if possible)
 	info, err := DetectNginx()
 	if err == nil && info.ConfPath != "" {

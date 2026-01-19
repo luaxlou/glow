@@ -18,7 +18,7 @@ var getResourcesCmd = &cobra.Command{
 			fmt.Printf("Error: %v\n", err)
 			return
 		}
-		
+
 		data, _ := json.Marshal(resp.Data)
 		var resources []api.ResourceRef
 		json.Unmarshal(data, &resources)
@@ -47,7 +47,7 @@ var getResourcesCmd = &cobra.Command{
 
 func init() {
 	getCmd.AddCommand(getResourcesCmd)
-	
+
 	// Generic Describe Logic
 	describeCmd.Run = func(cmd *cobra.Command, args []string) {
 		if len(args) == 0 {
@@ -55,21 +55,21 @@ func init() {
 			return
 		}
 		name := args[0]
-		
+
 		// 1. Try Resources
 		var resp api.Response
 		request("GET", "/resources/list", nil, &resp)
 		data, _ := json.Marshal(resp.Data)
 		var resources []api.ResourceRef
 		json.Unmarshal(data, &resources)
-		
+
 		for _, res := range resources {
 			if res.Name == name {
 				fmt.Printf("Resource: %s\nKind:     %s\nPort:     %d\n", res.Name, res.Kind, res.Port)
 				return
 			}
 		}
-		
+
 		// 2. Try Deployments
 		request("GET", "/apps/list", nil, &resp)
 		data, _ = json.Marshal(resp.Data)
@@ -81,7 +81,7 @@ func init() {
 				return
 			}
 		}
-		
+
 		fmt.Printf("Resource %s not found\n", name)
 	}
 }

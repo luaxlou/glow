@@ -31,3 +31,7 @@ func setSystemConfig(key, value string) error {
 func setSystemConfigJSON(key string, v interface{}) error {
 	return configmanager.SetSystemConfigJSON(key, v)
 }
+
+func deleteSystemConfig(key string) error {
+	return configmanager.DeleteSystemConfig(key)
+}

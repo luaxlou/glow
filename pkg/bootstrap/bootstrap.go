@@ -40,7 +40,7 @@ func Bootstrap(target string) error {
 	tmpDir, _ := os.MkdirTemp("", "op-simple-*")
 	defer os.RemoveAll(tmpDir)
 	serverBin := filepath.Join(tmpDir, "op-server")
-	
+
 	cmd := exec.Command("go", "build", "-o", serverBin, "cmd/op-server/main.go")
 	cmd.Env = append(os.Environ(), "GOOS=linux", "GOARCH=amd64")
 	if err := cmd.Run(); err != nil {
@@ -120,8 +120,8 @@ func uploadFile(client *ssh.Client, localPath, remotePath string) error {
 	defer f.Close()
 
 	stat, _ := f.Stat()
-	
-go func() {
+
+	go func() {
 		w, _ := session.StdinPipe()
 		defer w.Close()
 		fmt.Fprintf(w, "C%04o %d %s\n", 0755, stat.Size(), filepath.Base(remotePath))

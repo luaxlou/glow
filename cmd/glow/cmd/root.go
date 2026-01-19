@@ -48,7 +48,7 @@ var rootCmd = &cobra.Command{
 		if cmd.Name() == "auth" || cmd.Name() == "context" {
 			return nil
 		}
-		
+
 		return ensureConfig()
 	},
 }
@@ -115,7 +115,7 @@ func ensureConfig() error {
 			break
 		}
 	}
-	
+
 	if serverURL == "" {
 		return fmt.Errorf("context '%s' not found or invalid", targetContext)
 	}

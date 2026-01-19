@@ -45,7 +45,7 @@ var serveCmd = &cobra.Command{
 			StartTime: time.Now().UnixMilli(),
 		}
 		appcenter.RegisterActiveApp(serverAppInfo, nil)
-		
+
 		fmt.Printf("Registering glow-server in DB (PID: %d)...\n", os.Getpid())
 		if err := statemanager.SaveApp(serverAppInfo); err != nil {
 			fmt.Printf("ERROR: Failed to register glow-server in DB: %v\n", err)

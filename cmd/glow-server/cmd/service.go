@@ -111,7 +111,7 @@ func installSystemd(config ServiceConfig) error {
 func installLaunchd(config ServiceConfig) error {
 	homeDir, _ := os.UserHomeDir()
 	plistPath := fmt.Sprintf("%s/Library/LaunchAgents/com.luaxlou.glow-server.plist", homeDir)
-	
+
 	f, err := os.OpenFile(plistPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to create plist file: %v", err)

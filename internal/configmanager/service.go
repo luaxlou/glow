@@ -35,10 +35,10 @@ func Init() {
 // EnsureInitialized ensures that the service is initialized and cache is loaded.
 func EnsureInitialized() error {
 	Init()
-	
+
 	mu.Lock()
 	defer mu.Unlock()
-	
+
 	if len(cache) > 0 {
 		return nil
 	}
@@ -78,7 +78,7 @@ func Get(appName string) (map[string]any, error) {
 	if err := EnsureInitialized(); err != nil {
 		return nil, err
 	}
-	
+
 	mu.Lock()
 	defer mu.Unlock()
 

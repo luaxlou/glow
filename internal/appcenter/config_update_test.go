@@ -16,7 +16,7 @@ func TestSendConfigUpdate(t *testing.T) {
 	defer clientConn.Close()
 
 	appName := "test-app-config-update"
-	
+
 	// 2. Register the app
 	RegisterActiveApp(api.AppInfo{Name: appName}, serverConn)
 	defer UnregisterActiveApp(appName)
@@ -36,7 +36,7 @@ func TestSendConfigUpdate(t *testing.T) {
 	// 5. Read from clientConn
 	decoder := json.NewDecoder(clientConn)
 	var resp api.Response
-	
+
 	// Set read deadline to avoid hanging
 	clientConn.SetReadDeadline(time.Now().Add(2 * time.Second))
 	if err := decoder.Decode(&resp); err != nil {

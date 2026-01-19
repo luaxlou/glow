@@ -67,14 +67,14 @@ type Node struct {
 }
 
 type NodeStatus struct {
-	Hostname   string       `json:"hostname,omitempty" yaml:"hostname,omitempty"`
-	OS         string       `json:"os,omitempty" yaml:"os,omitempty"`
-	Arch       string       `json:"arch,omitempty" yaml:"arch,omitempty"`
-	Kernel     string       `json:"kernel,omitempty" yaml:"kernel,omitempty"`
-	CPUUsage   float64      `json:"cpuUsage,omitempty" yaml:"cpuUsage,omitempty"`
-	MemUsage   float64      `json:"memUsage,omitempty" yaml:"memUsage,omitempty"` // Percent
-	DiskUsage  float64      `json:"diskUsage,omitempty" yaml:"diskUsage,omitempty"` // Percent
-	Resources  []ResourceRef `json:"resources,omitempty" yaml:"resources,omitempty"`
+	Hostname  string        `json:"hostname,omitempty" yaml:"hostname,omitempty"`
+	OS        string        `json:"os,omitempty" yaml:"os,omitempty"`
+	Arch      string        `json:"arch,omitempty" yaml:"arch,omitempty"`
+	Kernel    string        `json:"kernel,omitempty" yaml:"kernel,omitempty"`
+	CPUUsage  float64       `json:"cpuUsage,omitempty" yaml:"cpuUsage,omitempty"`
+	MemUsage  float64       `json:"memUsage,omitempty" yaml:"memUsage,omitempty"`   // Percent
+	DiskUsage float64       `json:"diskUsage,omitempty" yaml:"diskUsage,omitempty"` // Percent
+	Resources []ResourceRef `json:"resources,omitempty" yaml:"resources,omitempty"`
 }
 
 type ResourceRef struct {
@@ -136,19 +136,19 @@ type StartAppRequest struct {
 
 // Deprecated: StopAppRequest
 type StopAppRequest struct {
-	Name       string `json:"name"`
+	Name        string `json:"name"`
 	KeepIngress bool   `json:"keep_ingress,omitempty"`
 }
 
 // Deprecated: AppInfo (Use Deployment.Status instead)
 type AppInfo struct {
-	Name        string            `json:"name"`
-	Command     string            `json:"command"`
-	Args        []string          `json:"args"`
-	WorkingDir  string            `json:"working_dir"`
-	Env         map[string]string `json:"env"`
-	Config      map[string]any    `json:"config"`
-	Port        int               `json:"port"`
+	Name         string            `json:"name"`
+	Command      string            `json:"command"`
+	Args         []string          `json:"args"`
+	WorkingDir   string            `json:"working_dir"`
+	Env          map[string]string `json:"env"`
+	Config       map[string]any    `json:"config"`
+	Port         int               `json:"port"`
 	Domain       string            `json:"domain"`
 	AutoRestart  bool              `json:"auto_restart"`
 	RestartCount int               `json:"restart_count"`
@@ -212,14 +212,14 @@ type NginxSystemConfig struct {
 
 // Host Manifest (Old) - Keep for backward compatibility or refactor
 type Host struct {
-	TypeMeta   `yaml:",inline"`
-	Metadata   ObjectMeta `yaml:"metadata" json:"metadata"`
-	Spec       HostSpec   `yaml:"spec" json:"spec"`
+	TypeMeta `yaml:",inline"`
+	Metadata ObjectMeta `yaml:"metadata" json:"metadata"`
+	Spec     HostSpec   `yaml:"spec" json:"spec"`
 }
 
 type HostSpec struct {
-	PublicIP string                  `yaml:"publicIP" json:"publicIP"`
-	Services map[string]ServiceSpec  `yaml:"services" json:"services"`
+	PublicIP string                 `yaml:"publicIP" json:"publicIP"`
+	Services map[string]ServiceSpec `yaml:"services" json:"services"`
 }
 
 type ServiceSpec struct {
@@ -230,19 +230,19 @@ type ServiceSpec struct {
 
 // App Manifest (Old)
 type App struct {
-	TypeMeta   `yaml:",inline"`
-	Metadata   ObjectMeta `yaml:"metadata" json:"metadata"`
-	Spec       AppSpecOld `yaml:"spec" json:"spec"`
+	TypeMeta `yaml:",inline"`
+	Metadata ObjectMeta `yaml:"metadata" json:"metadata"`
+	Spec     AppSpecOld `yaml:"spec" json:"spec"`
 }
 
 type AppSpecOld struct {
-	Binary       string                 `yaml:"binary" json:"binary"`
-	BinaryPath   string                 `yaml:"binaryPath,omitempty" json:"binaryPath,omitempty"` // Local path for upload
-	Command      string                 `yaml:"command" json:"command"`
-	Args         []string               `yaml:"args" json:"args"`
-	WorkingDir   string                 `yaml:"workingDir" json:"workingDir"`
-	Domain       string                 `yaml:"domain" json:"domain"`
-	Dependencies map[string]DepSpec     `yaml:"dependencies" json:"dependencies"`
+	Binary       string             `yaml:"binary" json:"binary"`
+	BinaryPath   string             `yaml:"binaryPath,omitempty" json:"binaryPath,omitempty"` // Local path for upload
+	Command      string             `yaml:"command" json:"command"`
+	Args         []string           `yaml:"args" json:"args"`
+	WorkingDir   string             `yaml:"workingDir" json:"workingDir"`
+	Domain       string             `yaml:"domain" json:"domain"`
+	Dependencies map[string]DepSpec `yaml:"dependencies" json:"dependencies"`
 }
 
 type DepSpec struct {

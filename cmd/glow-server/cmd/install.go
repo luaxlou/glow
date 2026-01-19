@@ -50,7 +50,7 @@ func stepService(reader *bufio.Reader) error {
 	} else {
 		fmt.Printf("\nWould you like to install Glow Server as a system service? [y/N]: ")
 	}
-	
+
 	input, _ := reader.ReadString('\n')
 	input = strings.ToLower(strings.TrimSpace(input))
 
@@ -87,7 +87,7 @@ func stepIngress(reader *bufio.Reader) error {
 	}
 
 	fmt.Printf("Configuring Nginx for %s...\n", domain)
-	
+
 	cfg := manager.NginxConfig{
 		Name:   "glow-server",
 		Port:   32102, // Default glow-server port

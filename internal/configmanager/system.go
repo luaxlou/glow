@@ -63,3 +63,12 @@ func SetSystemConfigJSON(key string, v interface{}) error {
 	}
 	return SetSystemConfig(key, string(b))
 }
+
+func DeleteSystemConfig(key string) error {
+	db, err := glowsqlite.DB()
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec("DELETE FROM system_config WHERE key = ?", key)
+	return err
+}

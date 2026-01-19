@@ -19,7 +19,7 @@ var contextListCmd = &cobra.Command{
 			fmt.Printf("Error loading config: %v\n", err)
 			return
 		}
-		
+
 		fmt.Println("CURRENT  NAME       URL")
 		for _, ctx := range cfg.Contexts {
 			current := " "
@@ -42,7 +42,7 @@ var contextUseCmd = &cobra.Command{
 			fmt.Printf("Error: %v\n", err)
 			return
 		}
-		
+
 		found := false
 		for _, ctx := range cfg.Contexts {
 			if ctx.Name == name {
@@ -50,12 +50,12 @@ var contextUseCmd = &cobra.Command{
 				break
 			}
 		}
-		
+
 		if !found {
 			fmt.Printf("Context '%s' not found\n", name)
 			return
 		}
-		
+
 		cfg.CurrentContext = name
 		saveConfig(cfg)
 		fmt.Printf("Switched to context '%s'\n", name)
@@ -70,35 +70,35 @@ var contextAddCmd = &cobra.Command{
 		name := args[0]
 		url, _ := cmd.Flags().GetString("url")
 		key, _ := cmd.Flags().GetString("key")
-		
+
 		if url == "" || key == "" {
 			fmt.Println("Error: --url and --key are required")
 			return
 		}
-		
+
 		cfg, err := loadConfig()
 		if err != nil {
 			cfg = &Config{}
 		}
-		
+
 		for _, ctx := range cfg.Contexts {
 			if ctx.Name == name {
 				fmt.Printf("Context '%s' already exists\n", name)
 				return
 			}
 		}
-		
+
 		cfg.Contexts = append(cfg.Contexts, Context{
-			Name: name,
+			Name:      name,
 			ServerURL: url,
-			APIKey: key,
+			APIKey:    key,
 		})
-		
+
 		if cfg.CurrentContext == "" {
 			cfg.CurrentContext = name
 		}
-		
-saveConfig(cfg)
+
+		saveConfig(cfg)
 		fmt.Printf("Context '%s' added\n", name)
 	},
 }
@@ -113,19 +113,19 @@ var contextDeleteCmd = &cobra.Command{
 		if err != nil {
 			return
 		}
-		
+
 		newContexts := []Context{}
 		for _, ctx := range cfg.Contexts {
 			if ctx.Name != name {
 				newContexts = append(newContexts, ctx)
 			}
 		}
-		
+
 		if len(newContexts) == len(cfg.Contexts) {
 			fmt.Printf("Context '%s' not found\n", name)
 			return
 		}
-		
+
 		cfg.Contexts = newContexts
 		if cfg.CurrentContext == name {
 			cfg.CurrentContext = ""
@@ -136,7 +136,7 @@ var contextDeleteCmd = &cobra.Command{
 				fmt.Println("Active context deleted. No contexts remaining.")
 			}
 		}
-	saveConfig(cfg)
+		saveConfig(cfg)
 		fmt.Printf("Context '%s' deleted\n", name)
 	},
 }
@@ -147,7 +147,7 @@ func init() {
 	contextCmd.AddCommand(contextUseCmd)
 	contextCmd.AddCommand(contextAddCmd)
 	contextCmd.AddCommand(contextDeleteCmd)
-	
+
 	contextAddCmd.Flags().String("url", "", "Server URL")
 	contextAddCmd.Flags().String("key", "", "API Key")
 }

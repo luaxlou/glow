@@ -21,7 +21,7 @@ var authViewCmd = &cobra.Command{
 			fmt.Printf("Error loading config: %v\n", err)
 			return
 		}
-		
+
 		var currentCtx *Context
 		for _, ctx := range cfg.Contexts {
 			if ctx.Name == cfg.CurrentContext {
@@ -29,7 +29,7 @@ var authViewCmd = &cobra.Command{
 				break
 			}
 		}
-		
+
 		if currentCtx == nil {
 			fmt.Println("No active context found.")
 			return
