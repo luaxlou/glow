@@ -25,8 +25,11 @@ var (
 	v    *viper.Viper
 	once sync.Once
 
-	// AppIdentity holds the manually set app name if EnvAppName is missing
 	AppIdentity string
+
+	lastAppInfo     api.AppInfo
+	lastServerAddr  string
+	reconnectLocker sync.Mutex
 )
 
 func checkVerbose() bool {
@@ -84,7 +87,6 @@ func load() {
 // Start initiates the connection to AppCenter, sends AppInfo, and handles config.
 // It blocks for up to 1 second waiting for the initial config.
 func Start(appInfo api.AppInfo) {
-	// Ensure viper is initialized (loads local config if available)
 	load()
 
 	serverAddr := os.Getenv(EnvServerURL)
@@ -93,6 +95,9 @@ func Start(appInfo api.AppInfo) {
 	}
 	serverAddr = strings.TrimPrefix(serverAddr, "http://")
 	serverAddr = strings.TrimPrefix(serverAddr, "tcp://")
+
+	lastAppInfo = appInfo
+	lastServerAddr = serverAddr
 
 	verboseLog("Connecting to AppCenter at %s...", serverAddr)
 
@@ -153,6 +158,7 @@ func monitorConfig(conn net.Conn) {
 		var resp api.Response
 		if err := decoder.Decode(&resp); err != nil {
 			log.Printf("Connection to AppCenter lost: %v", err)
+			reconnectToAppCenter()
 			return
 		}
 
@@ -190,6 +196,60 @@ func applyConfig(data any) {
 	if err := os.WriteFile(localConfigFile, dataBytes, 0644); err != nil {
 		log.Printf("Error writing local config file: %v", err)
 	}
+}
+
+func reconnectToAppCenter() {
+	reconnectLocker.Lock()
+	defer reconnectLocker.Unlock()
+
+	if lastAppInfo.Name == "" || lastServerAddr == "" {
+		return
+	}
+
+	backoff := time.Second
+	for i := 0; i < 5; i++ {
+		conn, err := net.DialTimeout("tcp", lastServerAddr, 2*time.Second)
+		if err != nil {
+			log.Printf("Reconnect attempt %d to AppCenter failed: %v", i+1, err)
+			time.Sleep(backoff)
+			backoff *= 2
+			continue
+		}
+
+		payload, _ := json.Marshal(lastAppInfo)
+		req := api.TCPRequest{
+			Action:  api.ActionAppStart,
+			AppName: lastAppInfo.Name,
+			Payload: payload,
+		}
+
+		if err := json.NewEncoder(conn).Encode(req); err != nil {
+			log.Printf("Failed to send reconnect start request: %v", err)
+			conn.Close()
+			time.Sleep(backoff)
+			backoff *= 2
+			continue
+		}
+
+		conn.SetReadDeadline(time.Now().Add(1 * time.Second))
+		var resp api.Response
+		if err := json.NewDecoder(conn).Decode(&resp); err != nil {
+			log.Printf("Reconnect: no config received or error: %v", err)
+		} else {
+			if resp.Success && resp.Data != nil {
+				verboseLog("Received config from AppCenter after reconnect")
+				applyConfig(resp.Data)
+			} else if !resp.Success {
+				log.Printf("Reconnect failed: %s", resp.Message)
+			}
+		}
+
+		conn.SetReadDeadline(time.Time{})
+		go monitorConfig(conn)
+		return
+	}
+
+	log.Printf("Reconnect to AppCenter aborted after retries")
 }
 
 func ProvisionResource(resourceType, resourceName string) (map[string]any, error) {

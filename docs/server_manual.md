@@ -33,6 +33,39 @@
 ./glow-server info
 ```
 
+示例输出（节选）：
+
+```text
+Glow Server Information
+-----------------------
+PID: 12345
+
+Managed Resources
+-----------------
+MySQL:
+  Host: 127.0.0.1
+  Port: 3306
+  Root User: root
+  Root Password: <PASSWORD>
+  Databases:
+    - app_db (charset=utf8mb4)
+  Raw Config:
+  {
+    "host": "127.0.0.1",
+    "port": 3306,
+    "user": "root",
+    "password": "<PASSWORD>",
+    "databases": [
+      {
+        "name": "app_db",
+        "charset": "utf8mb4"
+      }
+    ]
+  }
+Nginx: /usr/sbin/nginx (Version: 1.24.0)
+Service: [STATUS CHECK NOT IMPLEMENTED]
+```
+
 ## 3. HTTP API 参考
 
 Base URL: `http://localhost:32102`
