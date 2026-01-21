@@ -24,6 +24,14 @@
 - **AND** 备份 SHOULD 包含服务配置文件
 - **AND** 配置和数据库文件如将被修改也需备份
 
+#### Scenario: 重装复用既有配置与数据库
+- **WHEN** 用户再次执行安装脚本（重装场景）
+- **THEN** 脚本 MUST 检查本地配置目录与数据库文件是否已存在（例如配置目录与 `<data-dir>/glow.db`）
+- **AND** 若已存在，脚本 MUST NOT 重新创建或覆盖这些文件/目录
+- **AND** 若用户希望全新初始化，用户需要手动删除配置目录与数据库文件后再执行安装
+- **AND** 安装脚本 MUST 在输出中明确提示"已检测到并复用既有配置/数据库"
+- **AND** MUST 告知用户若需重置需手动删除哪些路径（例如配置目录与 `<data-dir>/glow.db`）
+
 #### Scenario: 安装期初始化
 - **WHEN** 安装脚本执行
 - **THEN** 脚本 MUST 自动执行 `glow-server keygen` 生成或复用 API Key
@@ -139,6 +147,12 @@
 - **AND** 脚本 MUST NOT 注册或启动常驻服务
 - **AND** 脚本 MUST 执行 `glow-server keygen` 以生成或复用 API Key
 - **AND** 脚本 MUST 为当前用户写入 `glow` 默认 context（指向 `http://localhost:32102`）
+
+#### Scenario: 本地开发重装复用既有配置与数据库
+- **WHEN** 用户再次执行本地开发安装脚本（重装场景）
+- **THEN** 脚本 MUST 检查本地数据目录与数据库文件是否已存在（例如 `<data-dir>/glow.db`）
+- **AND** 若已存在，脚本 MUST NOT 重新创建或覆盖该数据库
+- **AND** 脚本 MUST 在输出中提示"已复用既有数据库/配置"，并提示如何手动删除以重置
 
 #### Scenario: 本地开发使用
 - **WHEN** 用户希望在本地使用 Glow（开发模式）

@@ -207,9 +207,23 @@ install_binaries() {
     rm -rf "${TMP_DIR}"
 }
 
+# Check if database exists
+check_existing_database() {
+    local db_file="${DATA_DIR}/db/glow.db"
+    local config_dir="${DATA_DIR}/config"
+
+    if [ -f "$db_file" ]; then
+        log_warn "Detected existing database at ${db_file}"
+        log_warn "Reusing existing database and configuration"
+        return 0
+    fi
+
+    return 1
+}
+
 # Create data directory
 create_data_dir() {
-    log_info "Creating data directory at ${DATA_DIR}..."
+    log_info "Setting up data directory at ${DATA_DIR}..."
 
     if [ ! -w "/var/lib" ]; then
         SUDO="sudo"
@@ -217,15 +231,26 @@ create_data_dir() {
         SUDO=""
     fi
 
-    $SUDO mkdir -p "${DATA_DIR}/db"
+    # Check if database already exists
+    if check_existing_database; then
+        log_info "Skipping database creation - will reuse existing one"
+        log_info "To perform a clean install, manually remove:"
+        log_info "  - ${DATA_DIR}/db/"
+        log_info "  - ${DATA_DIR}/config/"
+    else
+        $SUDO mkdir -p "${DATA_DIR}/db"
+        $SUDO mkdir -p "${DATA_DIR}/config"
+        log_info "Created new database and config directories"
+    fi
+
+    # Always create logs and apps directories (safe to recreate)
     $SUDO mkdir -p "${DATA_DIR}/logs"
     $SUDO mkdir -p "${DATA_DIR}/apps"
-    $SUDO mkdir -p "${DATA_DIR}/config"
 
     # Set permissions
     $SUDO chown -R $(whoami):$(whoami) "${DATA_DIR}" 2>/dev/null || true
 
-    log_info "Data directory created"
+    log_info "Data directory setup completed"
 }
 
 # Generate API key and configure glow

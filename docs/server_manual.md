@@ -34,6 +34,26 @@ curl -fsSL "https://raw.githubusercontent.com/luaxlou/glow/main/scripts/uninstal
 - 配置 `glow` CLI 默认 context
 - Linux 场景下安装并启动系统服务（`install-local.sh` 不常驻、不注册服务）
 
+### 重装与升级
+
+重复执行安装脚本会自动检测并复用已有的配置和数据库：
+
+- **已检测到现有安装**：脚本会提示"已检测到并复用既有配置/数据库"
+- **不会覆盖数据**：现有的数据库文件（`glow.db`）和配置目录会被保留
+- **重装前备份**：脚本会在覆盖二进制文件前自动备份到 `/tmp/glow-server-backup-<timestamp>`
+
+如需完全重置（清除所有数据），请手动删除以下目录后重新执行安装：
+
+```bash
+# Linux 系统安装
+sudo rm -rf /var/lib/glow-server/db/
+sudo rm -rf /var/lib/glow-server/config/
+
+# 本地开发安装
+rm -rf ~/Library/Application Support/glow-server/db/  # macOS
+rm -rf ~/.local/share/glow-server/db/                  # Linux
+```
+
 ## 3. CLI 命令参考
 
 ### `keygen`

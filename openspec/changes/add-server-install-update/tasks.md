@@ -9,6 +9,7 @@
 - [x] 1.8 简化脚本：合并 `install-glow.sh` 与 `install-local-dev.sh` 为 `install-local.sh`（本地安装不常驻、不注册服务，安装 `glow` + `glow-server`）
 - [x] 1.9 增加 macOS 本地开发（用户级安装/不常驻/默认目录）支持要求
 - [x] 1.10 增加"本地开发一键安装脚本（不常驻）"要求（macOS 为主）
+- [x] 1.11 增加"重装复用既有配置与数据库（不覆盖）+ 安装提示告知如何重置"的要求（install/install-local）
 
 ## 2. Implementation (after approval)
 - [x] 2.1 增加 `glow-server version` 输出（version/commit/buildDate 由 ldflags 注入）
@@ -22,10 +23,12 @@
 - [x] 2.9 提供一键卸载脚本：停止/禁用服务、移除二进制与服务定义文件，但不删除配置与数据库；重装前自动备份逻辑落地
 - [x] 2.10 统一本地脚本为 `install-local.sh`：平台识别、下载 release、校验、落盘到 PATH（不注册/不启动常驻服务）
 - [x] 2.11 `install-local.sh` 支持 macOS 本地开发：用户级落盘、keygen、写入默认 context（不常驻）
+- [x] 2.12 落地重装幂等逻辑：检测并复用既有 config/db（存在则不覆盖），并在输出中提示检测结果与手动重置路径
 
 ## 3. Documentation
 - [x] 3.1 更新 `docs/server_manual.md`：一键安装、服务管理、更新与日志策略
 - [x] 3.2 更新 `README.md`：推荐安装路径与 quickstart
+- [x] 3.3 补充"重装复用与如何重置（手动删除哪些路径）"的说明（面向 install/install-local）
 
 ## 4. Validation
 - [x] 4.1 `openspec validate add-server-install-update --strict`

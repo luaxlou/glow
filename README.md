@@ -103,6 +103,8 @@ curl -fsSL "https://raw.githubusercontent.com/luaxlou/glow/main/scripts/uninstal
 - 写入 `glow` 默认 context（安装后可直接使用 `glow` 命令）
 - Linux 场景下安装/启用服务（`install-local.sh` 不常驻、不注册服务）
 
+> **重装说明**：重复执行安装脚本会自动检测并复用已有的配置和数据库。如需完全重置，请手动删除数据目录后重新安装。详见[重装与升级](docs/server_manual.md#重装与升级)。
+
 ### 2. 启动 Server
 
 ```bash
