@@ -230,8 +230,8 @@ setup_api_key() {
     # Ensure glow-server is in PATH for this session
     export PATH="${PATH}:${INSTALL_DIR}"
 
-    # Run glow-server keygen
-    if ! glow-server keygen --data-dir="${DATA_DIR}"; then
+    # Run glow-server keygen with GLOW_DATA_DIR environment variable
+    if ! GLOW_DATA_DIR="${DATA_DIR}" glow-server keygen; then
         log_error "Failed to generate API key"
         exit 1
     fi
