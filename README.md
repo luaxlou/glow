@@ -80,19 +80,38 @@ Glow 提供了一套类似 Spring Boot 的 Starter 机制（`glow/starter`），
 
 ## 快速开始 (Quick Start)
 
-### 1. 安装与初始化 Server
-首先，编译并启动 Glow Server，它是整个环境的控制中心。
+### 1. 安装 Glow（只提供一键脚本）
+
+安装与初始化统一通过脚本完成（不依赖 Go 工具链，不提供手动编译/拷贝安装方式）。
 
 ```bash
-# 1. 编译
-mkdir -p bin
-go build -o bin/glow-server cmd/glow-server/main.go
+# Linux 服务器（安装 glow-server + glow，启用服务）
+curl -fsSL "https://raw.githubusercontent.com/luaxlou/glow/main/scripts/install.sh" | sudo bash
 
-# 2. 启动 Server (同时启动 HTTP API :32102 与 TCP AppCenter :32101)
-./bin/glow-server serve
+# 本地安装（macOS/Linux，本地开发/仅客户端机器也可用；不常驻、不注册服务）
+curl -fsSL "https://raw.githubusercontent.com/luaxlou/glow/main/scripts/install-local.sh" | bash
+
+# 卸载（保留配置与数据库）
+curl -fsSL "https://raw.githubusercontent.com/luaxlou/glow/main/scripts/uninstall.sh" | sudo bash
 ```
 
-### 2. 运行示例应用
+脚本会自动完成：
+- 下载 release 预编译二进制（`glow-server` + `glow`）
+- sha256 校验
+- 安装到 PATH
+- 执行 `glow-server keygen`（生成/复用 API Key）
+- 写入 `glow` 默认 context（安装后可直接使用 `glow` 命令）
+- Linux 场景下安装/启用服务（`install-local.sh` 不常驻、不注册服务）
+
+### 2. 启动 Server
+
+```bash
+# 本地开发（macOS / 或任意不常驻场景）：前台启动
+# HTTP API :32102, App Center :32101
+glow-server serve
+```
+
+### 3. 运行示例应用
 保持 Server 运行，打开一个新的终端窗口运行示例应用。
 
 ```bash

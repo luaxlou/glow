@@ -4,8 +4,11 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"text/template"
+
+	"github.com/spf13/cobra"
 )
 
 const systemdTemplate = `[Unit]
@@ -14,10 +17,11 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart={{.BinaryPath}} serve
+ExecStart={{.BinaryPath}} serve --data-dir={{.DataDir}}
 Restart=always
 User={{.User}}
-WorkingDirectory={{.WorkDir}}
+WorkingDirectory={{.DataDir}}
+EnvironmentFile=-{{.EnvFile}}
 
 [Install]
 WantedBy=multi-user.target
@@ -33,17 +37,22 @@ const launchdTemplate = `<?xml version="1.0" encoding="UTF-8"?>
     <array>
         <string>{{.BinaryPath}}</string>
         <string>serve</string>
+        <string>--data-dir={{.DataDir}}</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
     <true/>
     <key>StandardOutPath</key>
-    <string>{{.WorkDir}}/server.log</string>
+    <string>{{.DataDir}}/logs/server.log</string>
     <key>StandardErrorPath</key>
-    <string>{{.WorkDir}}/server.log</string>
+    <string>{{.DataDir}}/logs/server.log</string>
     <key>WorkingDirectory</key>
-    <string>{{.WorkDir}}</string>
+    <string>{{.DataDir}}</string>
+    <key>EnvironmentFiles</key>
+    <array>
+        <string>{{.EnvFile}}</string>
+    </array>
 </dict>
 </plist>
 `
@@ -51,7 +60,56 @@ const launchdTemplate = `<?xml version="1.0" encoding="UTF-8"?>
 type ServiceConfig struct {
 	BinaryPath string
 	User       string
-	WorkDir    string
+	DataDir    string
+	EnvFile    string
+}
+
+var serviceCmd = &cobra.Command{
+	Use:   "service",
+	Short: "Manage glow-server system service",
+}
+
+var serviceInstallCmd = &cobra.Command{
+	Use:   "install",
+	Short: "Install glow-server as a system service",
+	Run: func(cmd *cobra.Command, args []string) {
+		if err := installService(); err != nil {
+			fmt.Printf("Failed to install service: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println("Service installed successfully!")
+	},
+}
+
+var serviceStartCmd = &cobra.Command{
+	Use:   "start",
+	Short: "Start glow-server service",
+	Run: func(cmd *cobra.Command, args []string) {
+		if err := startService(); err != nil {
+			fmt.Printf("Failed to start service: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println("Service started successfully!")
+	},
+}
+
+var serviceStopCmd = &cobra.Command{
+	Use:   "stop",
+	Short: "Stop glow-server service",
+	Run: func(cmd *cobra.Command, args []string) {
+		if err := stopService(); err != nil {
+			fmt.Printf("Failed to stop service: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println("Service stopped successfully!")
+	},
+}
+
+func init() {
+	rootCmd.AddCommand(serviceCmd)
+	serviceCmd.AddCommand(serviceInstallCmd)
+	serviceCmd.AddCommand(serviceStartCmd)
+	serviceCmd.AddCommand(serviceStopCmd)
 }
 
 func installService() error {
@@ -60,19 +118,46 @@ func installService() error {
 		return err
 	}
 
-	workDir, err := os.Getwd()
-	if err != nil {
-		return err
-	}
+	// Use fixed data directory
+	dataDir := "/var/lib/glow-server"
+	envFile := "/etc/default/glow-server"
 
 	config := ServiceConfig{
 		BinaryPath: exePath,
 		User:       os.Getenv("USER"),
-		WorkDir:    workDir,
+		DataDir:    dataDir,
+		EnvFile:    envFile,
 	}
 
 	if config.User == "" {
 		config.User = "root"
+	}
+
+	// Create data directory and subdirectories
+	if err := os.MkdirAll(dataDir, 0755); err != nil {
+		return fmt.Errorf("failed to create data directory: %v", err)
+	}
+
+	dirs := []string{
+		filepath.Join(dataDir, "db"),
+		filepath.Join(dataDir, "logs"),
+		filepath.Join(dataDir, "apps"),
+		filepath.Join(dataDir, "config"),
+	}
+
+	for _, dir := range dirs {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return fmt.Errorf("failed to create directory %s: %v", dir, err)
+		}
+	}
+
+	// Create environment file
+	envContent := "# Glow Server Environment Configuration\n"
+	envContent += "# PORT=32102\n"
+	envContent += "# APP_CENTER_PORT=32101\n"
+
+	if err := os.WriteFile(envFile, []byte(envContent), 0644); err != nil {
+		return fmt.Errorf("failed to create environment file: %v", err)
 	}
 
 	switch runtime.GOOS {
@@ -132,16 +217,28 @@ func installLaunchd(config ServiceConfig) error {
 	return nil
 }
 
-func isServiceInstalled() bool {
+func startService() error {
 	switch runtime.GOOS {
 	case "linux":
-		_, err := os.Stat("/etc/systemd/system/glow-server.service")
-		return err == nil
+		return exec.Command("systemctl", "start", "glow-server").Run()
 	case "darwin":
 		homeDir, _ := os.UserHomeDir()
-		plistPath := fmt.Sprintf("%s/Library/LaunchAgents/com.luaxlou.glow-server.plist", homeDir)
-		_, err := os.Stat(plistPath)
-		return err == nil
+		plistPath := filepath.Join(homeDir, "Library/LaunchAgents/com.luaxlou.glow-server.plist")
+		return exec.Command("launchctl", "load", plistPath).Run()
+	default:
+		return fmt.Errorf("unsupported operating system: %s", runtime.GOOS)
 	}
-	return false
+}
+
+func stopService() error {
+	switch runtime.GOOS {
+	case "linux":
+		return exec.Command("systemctl", "stop", "glow-server").Run()
+	case "darwin":
+		homeDir, _ := os.UserHomeDir()
+		plistPath := filepath.Join(homeDir, "Library/LaunchAgents/com.luaxlou.glow-server.plist")
+		return exec.Command("launchctl", "unload", plistPath).Run()
+	default:
+		return fmt.Errorf("unsupported operating system: %s", runtime.GOOS)
+	}
 }

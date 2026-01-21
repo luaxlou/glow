@@ -5,9 +5,12 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 
 	"github.com/luaxlou/glow/internal/configmanager"
 	"github.com/spf13/cobra"
+	"github.com/luaxlou/glow/starter/glowsqlite"
 )
 
 var keygenCmd = &cobra.Command{
@@ -20,7 +23,30 @@ func init() {
 	rootCmd.AddCommand(keygenCmd)
 }
 
+func initDB() error {
+	// Determine data directory
+	dataDir := os.Getenv("GLOW_DATA_DIR")
+	if dataDir == "" {
+		dataDir = "/var/lib/glow-server"
+	}
+
+	// Create data directory if it doesn't exist
+	dbDir := filepath.Join(dataDir, "db")
+	if err := os.MkdirAll(dbDir, 0755); err != nil {
+		return err
+	}
+
+	// Initialize DB
+	dbPath := filepath.Join(dbDir, "glow.db")
+	glowsqlite.Init(dbPath)
+	return nil
+}
+
 func runKeygen(cmd *cobra.Command, args []string) {
+	// Initialize DB
+	if err := initDB(); err != nil {
+		log.Fatalf("Failed to initialize database: %v", err)
+	}
 	// Check if key exists
 	key, err := configmanager.GetSystemConfig("api_key")
 	if err == nil && key != "" {

@@ -5,17 +5,25 @@
 ## 1. 安装与配置
 
 ### 安装
-（假设 `glow` 二进制文件已编译并放置于系统 PATH 路径下）
-
-### 初始化配置
-首次使用时，需要配置连接到的 Glow Server 地址及认证密钥。
+只提供一键脚本安装（不依赖 Go 工具链，不提供手动编译/拷贝安装方式）。
 
 ```bash
-# 交互式引导配置
-glow context add local --url http://localhost:32102 --key <YOUR_API_KEY>
+# 本地安装（安装 glow + glow-server；不常驻、不注册服务）
+curl -fsSL "https://raw.githubusercontent.com/luaxlou/glow/main/scripts/install-local.sh" | bash
+```
+
+### 初始化配置
+如果你是通过“安装 glow-server + glow”的一键脚本安装，脚本会自动执行 `glow-server keygen` 并写入 `glow` 的默认 context；
+此时你可以直接执行 `glow get ...`。
+
+需要连接到其他 Glow Server 时，再手动添加/切换 context：
+
+```bash
+# 添加一个远端环境
+glow context add prod --url http://<YOUR_SERVER>:32102 --key <YOUR_API_KEY>
 
 # 切换上下文
-glow context use local
+glow context use prod
 ```
 
 配置信息默认存储在 `~/.glow.json`。

@@ -27,12 +27,13 @@ Thumbs.db
 # IDEs
 .idea/
 .vscode/
+.claude/
+.cursor/
 *.swp
 *.swo
 
 # Project specific
 glow.db
 *.log
-scripts/
-/glow
-/glow-server
+glow
+glow-server

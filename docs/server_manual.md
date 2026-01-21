@@ -9,28 +9,67 @@
 *   **网关自动化**: 基于应用域名自动生成 Nginx 反向代理配置。
 *   **SDK 协同**: 通过 TCP (AppCenter) 与应用 SDK 保持长连接，实现服务注册与心跳保活。
 
-## 2. CLI 命令参考
+## 2. 安装与初始化
 
-### `install`
-交互式安装向导，引导完成密钥生成、资源集成、系统服务注册与反向代理配置。
+### 一键安装（推荐）
+
+安装与初始化统一通过脚本完成（不依赖 Go 工具链，不提供手动编译/拷贝安装方式）。
 
 ```bash
-./glow-server install
+# Linux 服务器（安装 glow-server + glow，启用服务）
+curl -fsSL "https://raw.githubusercontent.com/luaxlou/glow/main/scripts/install.sh" | sudo bash
+
+# 本地安装（macOS/Linux，不常驻；需要时前台启动）
+curl -fsSL "https://raw.githubusercontent.com/luaxlou/glow/main/scripts/install-local.sh" | bash
+
+# 卸载（保留配置与数据库）
+curl -fsSL "https://raw.githubusercontent.com/luaxlou/glow/main/scripts/uninstall.sh" | sudo bash
+```
+
+安装脚本会自动完成：
+- 下载最新版本二进制文件
+- sha256 校验
+- 安装到 PATH
+- 执行 `glow-server keygen`（生成/复用 API Key）
+- 配置 `glow` CLI 默认 context
+- Linux 场景下安装并启动系统服务（`install-local.sh` 不常驻、不注册服务）
+
+## 3. CLI 命令参考
+
+### `keygen`
+生成或查看 API Key。
+
+```bash
+glow-server keygen
 ```
 
 ### `serve`
-启动核心服务守护进程。同时开启 HTTP API Server (默认端口 32102) 与 TCP AppCenter (默认端口 32101)。
+启动核心服务守护进程。
 
 ```bash
-# 启动服务 (需先运行 install 或 keygen)
-./glow-server serve [--port 32102] [--app-center-port 32101] [--dir .]
+# 本地开发：前台启动
+glow-server serve
+```
+
+### `add`
+添加系统资源（MySQL、Redis、Nginx）。
+
+```bash
+# 添加 MySQL
+glow-server add mysql
+
+# 添加 Redis
+glow-server add redis
+
+# 添加/发现 Nginx
+glow-server add nginx
 ```
 
 ### `info`
 显示当前服务器的配置状态、集成的资源信息及服务运行状态。
 
 ```bash
-./glow-server info
+glow-server info
 ```
 
 示例输出（节选）：

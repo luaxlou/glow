@@ -25,25 +25,28 @@ func New() *Server {
 func (s *Server) RegisterRoutes(r *gin.Engine) {
 	r.GET("/health", s.handleHealth)
 
+	// All management APIs require CLI authentication (Bearer API Key).
+	protected := r.Group("/", RequireAPIKey())
+
 	// --- Config Management ---
-	r.Any("/config/*appName", s.handleConfig)
+	protected.Any("/config/*appName", s.handleConfig)
 
 	// --- App Management ---
-	r.POST("/apps/upload", s.handleUploadApp)
-	r.POST("/apps/start", s.handleStartApp)
-	r.POST("/apps/stop", s.handleStopApp)
-	r.POST("/apps/restart", s.handleRestartApp)
-	r.POST("/apps/delete", s.handleDeleteApp)
-	r.GET("/apps/list", s.handleListApps)
-	r.GET("/apps/logs", s.handleAppLogs)
+	protected.POST("/apps/upload", s.handleUploadApp)
+	protected.POST("/apps/start", s.handleStartApp)
+	protected.POST("/apps/stop", s.handleStopApp)
+	protected.POST("/apps/restart", s.handleRestartApp)
+	protected.POST("/apps/delete", s.handleDeleteApp)
+	protected.GET("/apps/list", s.handleListApps)
+	protected.GET("/apps/logs", s.handleAppLogs)
 
 	// --- Node Management ---
-	r.GET("/node/status", s.handleNodeStatus) // New
+	protected.GET("/node/status", s.handleNodeStatus) // New
 
 	// --- Ingress Management ---
-	r.POST("/ingress/update", s.handleUpdateIngress)
-	r.POST("/ingress/delete", s.handleDeleteIngress)
-	r.GET("/ingress/list", s.handleListIngress)
+	protected.POST("/ingress/update", s.handleUpdateIngress)
+	protected.POST("/ingress/delete", s.handleDeleteIngress)
+	protected.GET("/ingress/list", s.handleListIngress)
 }
 
 func (s *Server) handleHealth(c *gin.Context) {

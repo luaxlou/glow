@@ -4,33 +4,52 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/luaxlou/glow/internal/apiserver"
 	"github.com/luaxlou/glow/internal/appcenter"
 	"github.com/luaxlou/glow/internal/configmanager"
+	"github.com/luaxlou/glow/internal/manager"
 	"github.com/luaxlou/glow/internal/statemanager"
 	"github.com/luaxlou/glow/pkg/api"
 	"github.com/luaxlou/glow/starter/glowapp"
 	"github.com/luaxlou/glow/starter/glowhttp"
+	"github.com/luaxlou/glow/starter/glowsqlite"
 	"github.com/spf13/cobra"
 )
 
 var (
 	serverPort    int
 	appCenterPort int
+	dataDir       string
+	maxAgeDays    int
+	maxTotalMB    int
 )
 
 func init() {
 	rootCmd.AddCommand(serveCmd)
 	serveCmd.Flags().IntVarP(&serverPort, "port", "p", 32102, "HTTP Port")
 	serveCmd.Flags().IntVarP(&appCenterPort, "app-center-port", "a", 32101, "App Center Port")
+	serveCmd.Flags().StringVar(&dataDir, "data-dir", "", "Data directory path (default: /var/lib/glow-server)")
+	serveCmd.Flags().IntVar(&maxAgeDays, "log-max-age-days", 30, "Maximum age of log files in days")
+	serveCmd.Flags().IntVar(&maxTotalMB, "log-max-total-mb", 500, "Maximum total size of log files in MB")
 }
 
 var serveCmd = &cobra.Command{
 	Use:   "serve",
 	Short: "Start the Glow Server (HTTP API)",
 	Run: func(cmd *cobra.Command, args []string) {
+		// Set up data directory
+		if err := setupDataDir(); err != nil {
+			log.Fatalf("Failed to setup data directory: %v", err)
+		}
+
+		// Start log cleaner
+		logDir := filepath.Join(dataDir, "logs")
+		manager.StartPeriodicCleanup(logDir, maxAgeDays, maxTotalMB, 24*time.Hour)
+		log.Printf("Started log cleaner (max age: %d days, max total: %d MB)", maxAgeDays, maxTotalMB)
+
 		// Initialize Config Manager
 		if err := configmanager.EnsureInitialized(); err != nil {
 			log.Fatalf("Failed to init config manager: %v", err)
@@ -74,4 +93,36 @@ var serveCmd = &cobra.Command{
 		glowhttp.Run()
 		glowapp.WaitForShutdown()
 	},
+}
+
+func setupDataDir() error {
+	// Determine data directory
+	if dataDir == "" {
+		dataDir = "/var/lib/glow-server"
+	}
+
+	// Create data directory and subdirectories
+	if err := os.MkdirAll(dataDir, 0755); err != nil {
+		return fmt.Errorf("failed to create data directory: %w", err)
+	}
+
+	// Create subdirectories
+	dirs := []string{
+		filepath.Join(dataDir, "db"),
+		filepath.Join(dataDir, "logs"),
+		filepath.Join(dataDir, "apps"),
+		filepath.Join(dataDir, "config"),
+	}
+
+	for _, dir := range dirs {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return fmt.Errorf("failed to create directory %s: %w", dir, err)
+		}
+	}
+
+	// Update DB path to use data directory
+	dbPath := filepath.Join(dataDir, "db", "glow.db")
+	glowsqlite.Init(dbPath)
+
+	return nil
 }
