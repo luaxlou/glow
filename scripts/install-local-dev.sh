@@ -91,7 +91,6 @@ download_binary() {
 
     local filename="${binary_name}-${OS}-${ARCH}"
     local download_url="https://github.com/${REPO}/releases/download/v${VERSION}/${filename}"
-    local checksum_url="${download_url}.sha256"
 
     log_info "Downloading ${binary_name} from ${download_url}..."
 
@@ -101,33 +100,31 @@ download_binary() {
         exit 1
     fi
 
-    # Download and verify checksum
+    # Verify checksum from SHA256SUMS.txt
     log_info "Verifying checksum..."
-    if curl -fSL -o "${output_path}.sha256" "${checksum_url}"; then
+    if [ -f "${TMP_DIR:-/tmp}/SHA256SUMS.txt" ]; then
         if command -v sha256sum &> /dev/null; then
             downloaded_checksum=$(sha256sum "${output_path}" | awk '{print $1}')
         elif command -v shasum &> /dev/null; then
             downloaded_checksum=$(shasum -a 256 "${output_path}" | awk '{print $1}')
         else
             log_warn "No checksum tool available, skipping verification"
-            rm -f "${output_path}.sha256"
             return
         fi
 
-        expected_checksum=$(cat "${output_path}.sha256" | awk '{print $1}')
+        expected_checksum=$(grep "${filename}" "${TMP_DIR:-/tmp}/SHA256SUMS.txt" | awk '{print $1}')
 
         if [ "$downloaded_checksum" != "$expected_checksum" ]; then
             log_error "Checksum verification failed!"
             log_error "Expected: $expected_checksum"
             log_error "Got: $downloaded_checksum"
-            rm -f "${output_path}" "${output_path}.sha256"
+            rm -f "${output_path}"
             exit 1
         fi
 
         log_info "Checksum verified successfully"
-        rm -f "${output_path}.sha256"
     else
-        log_warn "Failed to download checksum, skipping verification"
+        log_warn "SHA256SUMS.txt not found, skipping verification"
     fi
 
     # Make executable
@@ -137,6 +134,17 @@ download_binary() {
 # Install binaries
 install_binaries() {
     log_step "Installing binaries to ${INSTALL_DIR}..."
+
+    # Create temp directory
+    TMP_DIR=$(mktemp -d)
+    export TMP_DIR
+
+    # Download SHA256SUMS.txt
+    log_info "Downloading SHA256SUMS.txt..."
+    local checksum_url="https://github.com/${REPO}/releases/download/v${VERSION}/SHA256SUMS.txt"
+    if ! curl -fSL -o "${TMP_DIR}/SHA256SUMS.txt" "${checksum_url}"; then
+        log_warn "Failed to download SHA256SUMS.txt, skipping verification"
+    fi
 
     # Create install directory if it doesn't exist
     mkdir -p "${INSTALL_DIR}"
@@ -156,16 +164,19 @@ install_binaries() {
     fi
 
     # Download and install glow-server
-    glow_server_tmp="/tmp/glow-server-${VERSION}"
+    glow_server_tmp="${TMP_DIR}/glow-server-${VERSION}"
     download_binary "glow-server" "${glow_server_tmp}"
     mv "${glow_server_tmp}" "${INSTALL_DIR}/glow-server"
     log_info "Installed glow-server"
 
     # Download and install glow
-    glow_tmp="/tmp/glow-${VERSION}"
+    glow_tmp="${TMP_DIR}/glow-${VERSION}"
     download_binary "glow" "${glow_tmp}"
     mv "${glow_tmp}" "${INSTALL_DIR}/glow"
     log_info "Installed glow"
+
+    # Cleanup
+    rm -rf "${TMP_DIR}"
 }
 
 # Create data directory
