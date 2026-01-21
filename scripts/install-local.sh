@@ -1,15 +1,22 @@
 #!/bin/bash
 set -e
 
-# Glow Local Development Installation Script
-# Installs both glow-server and glow CLI for local development
+# Glow Local Installation Script
+# Installs both glow-server and glow CLI for local use
 # Does NOT register or start any system service/daemon
-# Designed for macOS local development (can also work on Linux)
+# Works on both macOS and Linux
 
 # Configuration
 REPO="luaxlou/glow"
 INSTALL_DIR="${HOME}/.local/bin"
-DATA_DIR="${HOME}/Library/Application Support/glow-server"
+
+# Platform-specific data directory
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    DATA_DIR="${HOME}/Library/Application Support/glow-server"
+else
+    DATA_DIR="${HOME}/.glow-server"
+fi
+
 SERVER_URL="http://localhost:32102"
 
 # Colors for output
@@ -257,7 +264,7 @@ check_path() {
 print_summary() {
     echo ""
     echo "=========================================="
-    log_info "Local development installation completed!"
+    log_info "Local installation completed!"
     echo "=========================================="
     echo ""
     echo "Installed binaries:"
@@ -266,7 +273,7 @@ print_summary() {
     echo ""
     echo "Data directory: ${DATA_DIR}"
     echo ""
-    echo "NOTE: This is a LOCAL DEVELOPMENT installation."
+    echo "NOTE: This is a LOCAL installation."
     echo "No system service or daemon has been registered."
     echo ""
     echo "To start using Glow:"
@@ -288,10 +295,10 @@ print_summary() {
 # Main installation flow
 main() {
     echo ""
-    echo "Glow Local Development Installation Script"
-    echo "==========================================="
+    echo "Glow Local Installation Script"
+    echo "=========================================="
     echo ""
-    echo "This script installs glow-server and glow for LOCAL DEVELOPMENT."
+    echo "This script installs glow-server and glow for LOCAL USE."
     echo "It will NOT register any system service or daemon."
     echo "You will start the server manually in foreground mode."
     echo ""
