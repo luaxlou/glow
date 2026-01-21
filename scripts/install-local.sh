@@ -231,17 +231,21 @@ setup_api_key() {
     export PATH="${PATH}:${INSTALL_DIR}"
 
     # Run glow-server keygen with GLOW_DATA_DIR environment variable
-    if ! GLOW_DATA_DIR="${DATA_DIR}" glow-server keygen; then
+    # Capture the output to get the API key
+    KEYGEN_OUTPUT=$(GLOW_DATA_DIR="${DATA_DIR}" glow-server keygen 2>&1)
+    if [ $? -ne 0 ]; then
         log_error "Failed to generate API key"
+        log_error "${KEYGEN_OUTPUT}"
         exit 1
     fi
 
-    # Get the API key from the key file
-    API_KEY_FILE="${DATA_DIR}/config/apikey.txt"
-    if [ -f "${API_KEY_FILE}" ]; then
-        API_KEY=$(cat "${API_KEY_FILE}")
-    else
-        log_error "Failed to find API key file at ${API_KEY_FILE}"
+    # Extract the API key from the output
+    # Output format: "Generated New API Key: <key>" or "Existing API Key: <key>"
+    API_KEY=$(echo "${KEYGEN_OUTPUT}" | grep -oE 'Generated New API Key: [0-9a-f]+|Existing API Key: [0-9a-f]+' | sed 's/.*: //')
+
+    if [ -z "$API_KEY" ]; then
+        log_error "Failed to extract API key from keygen output"
+        log_error "Output was: ${KEYGEN_OUTPUT}"
         exit 1
     fi
 

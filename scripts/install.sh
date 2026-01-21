@@ -257,17 +257,21 @@ create_data_dir() {
 setup_api_key() {
     log_info "Generating API key..."
 
-    # Run glow-server keygen
-    if ! glow-server keygen; then
+    # Run glow-server keygen and capture output
+    KEYGEN_OUTPUT=$(glow-server keygen 2>&1)
+    if [ $? -ne 0 ]; then
         log_error "Failed to generate API key"
+        log_error "${KEYGEN_OUTPUT}"
         exit 1
     fi
 
-    # Get the API key
-    API_KEY=$(glow-server keygen 2>&1 | grep -oP 'Existing API Key: \K.*' || glow-server keygen 2>&1 | grep -oP 'Generated New API Key: \K.*')
+    # Extract the API key from the output
+    # Output format: "Generated New API Key: <key>" or "Existing API Key: <key>"
+    API_KEY=$(echo "${KEYGEN_OUTPUT}" | grep -oE 'Generated New API Key: [0-9a-f]+|Existing API Key: [0-9a-f]+' | sed 's/.*: //')
 
     if [ -z "$API_KEY" ]; then
-        log_error "Failed to retrieve API key"
+        log_error "Failed to extract API key from keygen output"
+        log_error "Output was: ${KEYGEN_OUTPUT}"
         exit 1
     fi
 
