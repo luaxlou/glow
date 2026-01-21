@@ -250,13 +250,13 @@ setup_api_key() {
     # Configure glow CLI with default context
     log_step "Configuring glow CLI..."
 
-    if ! glow config add default \
-        --server-url="${SERVER_URL}" \
-        --api-key="${API_KEY}"; then
+    if ! glow context add default \
+        --url="${SERVER_URL}" \
+        --key="${API_KEY}"; then
         log_warn "Failed to configure glow CLI automatically"
         log_warn "You can configure it manually with:"
         echo ""
-        echo "  glow config add default --server-url=${SERVER_URL} --api-key=${API_KEY}"
+        echo "  glow context add default --url=${SERVER_URL} --key=${API_KEY}"
         echo ""
     else
         log_info "glow CLI configured with default context"

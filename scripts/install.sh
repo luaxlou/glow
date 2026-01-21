@@ -276,9 +276,9 @@ setup_api_key() {
     # Configure glow CLI with default context
     log_info "Configuring glow CLI..."
 
-    glow config add default \
-        --server-url="http://localhost:32102" \
-        --api-key="${API_KEY}"
+    glow context add default \
+        --url="http://localhost:32102" \
+        --key="${API_KEY}"
 
     log_info "glow CLI configured with default context"
 }
