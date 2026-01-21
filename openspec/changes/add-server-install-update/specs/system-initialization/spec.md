@@ -22,6 +22,17 @@
 - **AND** 备份 MUST 至少包含既有的 `glow-server` 与 `glow` 二进制文件
 - **AND** 若脚本将修改或覆盖服务定义文件与环境文件，则这些文件也 MUST 被备份
 
+#### Scenario: 重装检查并复用既有配置与数据库
+- **WHEN** 用户再次执行一键安装脚本（重装场景）
+- **THEN** 脚本 MUST 检查本地配置目录与数据库文件是否已存在（例如配置目录与 `<data-dir>/glow.db`）
+- **AND** 若已存在，脚本 MUST NOT 重新创建或覆盖这些文件/目录
+- **AND** 若用户希望全新初始化，用户需要手动删除配置目录与数据库文件后再执行安装
+
+#### Scenario: 重装提示（告知已复用状态）
+- **WHEN** 安装脚本检测到本地已存在配置目录或数据库文件
+- **THEN** 安装脚本 MUST 在输出中明确提示“已检测到并复用既有配置/数据库”
+- **AND** MUST 告知用户若需重置需手动删除哪些路径（例如配置目录与 `<data-dir>/glow.db`）
+
 ### Requirement: Curl 一键卸载 (One-line Uninstall)
 系统 MUST 提供可通过 `curl` 一键执行的卸载入口，用于移除 `glow-server`/`glow` 二进制与系统服务注册。
 
@@ -43,6 +54,12 @@
 - **WHEN** 用户运行 `curl -fsSL <install-local-script-url> | bash`
 - **THEN** 脚本 MUST 安装 `glow` 与 `glow-server` 两个可执行文件
 - **AND** 脚本 MUST NOT 注册/启用/启动任何系统服务（systemd/launchd）
+
+#### Scenario: install-local 重装复用既有数据
+- **WHEN** 用户再次执行 `install-local.sh`（重装场景）
+- **THEN** 脚本 MUST 检查本地数据目录与数据库文件是否已存在（例如 `<data-dir>/glow.db`）
+- **AND** 若已存在，脚本 MUST NOT 重新创建或覆盖该数据库
+- **AND** 脚本 MUST 在输出中提示“已复用既有数据库/配置”，并提示如何手动删除以重置
 
 #### Scenario: install-local 放置到 PATH（按环境选择）
 - **WHEN** 脚本在本地安装模式下写入可执行文件

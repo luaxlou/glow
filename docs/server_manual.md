@@ -109,6 +109,46 @@ Service: [STATUS CHECK NOT IMPLEMENTED]
 
 Base URL: `http://localhost:32102`
 
+### API 认证
+
+除 `/health` 端点外，所有 HTTP 管理 API 均需要 API Key 认证。客户端必须在请求头中包含有效的 API Key：
+
+```http
+Authorization: Bearer <api_key>
+```
+
+**认证错误码**：
+
+| HTTP 状态码 | 说明 | 示例场景 |
+|------------|------|---------|
+| 200 | 认证成功 | API Key 匹配 |
+| 401 | 未授权 | 缺少 `Authorization` 头或格式错误 |
+| 403 | 禁止访问 | API Key 不匹配 |
+| 500 | 服务器错误 | 服务端未配置 `api_key` |
+
+**示例请求**：
+
+```bash
+# 使用 curl 访问受保护的 API
+curl -H "Authorization: Bearer your-api-key" \
+  http://localhost:32102/apps/list
+
+# 使用 Glow CLI（CLI 会自动添加认证头）
+glow app list
+```
+
+**获取 API Key**：
+
+```bash
+# 查看服务器生成的 API Key
+glow-server keygen
+```
+
+**注意**：
+- API Key 在安装时通过 `glow-server keygen` 自动生成并存储在 SQLite `system_config` 表中
+- Glow CLI 会自动读取并使用该 API Key，无需手动配置
+- API Key 应妥善保管，建议仅通过本地或受信任的网络访问管理端口
+
 ### 应用管理
 | Method | Endpoint | Description | Payload |
 |--------|----------|-------------|---------|
