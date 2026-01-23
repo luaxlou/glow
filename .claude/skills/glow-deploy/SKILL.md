@@ -36,7 +36,7 @@ glow deploy <binary_path>
 # 指定应用名称
 glow deploy ./myapp --name custom-name
 
-# 部署脚本（由 glow init 生成）
+# 部署脚本（由 init 脚本生成）
 ./scripts/deploy.sh              # 单应用自动部署
 ./scripts/deploy.sh <app_name>   # 指定应用部署
 ./scripts/deploy.sh              # 多应用交互式选择

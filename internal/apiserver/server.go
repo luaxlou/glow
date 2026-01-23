@@ -6,7 +6,10 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/luaxlou/glow/internal/configmanager"
@@ -51,6 +54,9 @@ func (s *Server) RegisterRoutes(r *gin.Engine) {
 
 	// --- Node Management ---
 	protected.GET("/node/status", s.handleNodeStatus) // New
+
+	// --- Server Management ---
+	protected.GET("/server/info", s.handleServerInfo) // New
 
 	// --- Ingress Management ---
 	protected.POST("/ingress/update", s.handleUpdateIngress)
@@ -117,6 +123,7 @@ type upsertAppRequest struct {
 	WorkingDir string            `json:"workingDir"`
 	Domain     string            `json:"domain"`
 	Env        map[string]string `json:"env"`
+	Config     map[string]any    `json:"config"`
 }
 
 func (s *Server) handleUpsertApp(c *gin.Context) {
@@ -177,6 +184,15 @@ func (s *Server) handleUpsertApp(c *gin.Context) {
 	app.Domain = req.Domain
 	app.WorkingDir = req.WorkingDir
 	app.Env = req.Env
+	app.Config = req.Config
+
+	// Save config to configmanager if provided
+	if req.Config != nil {
+		if err := configmanager.Set(name, req.Config, false); err != nil {
+			c.JSON(http.StatusInternalServerError, api.Response{Success: false, Message: fmt.Sprintf("Failed to save config: %v", err)})
+			return
+		}
+	}
 
 	if err := statemanager.SaveApp(*app); err != nil {
 		c.JSON(http.StatusInternalServerError, api.Response{Success: false, Message: err.Error()})
@@ -625,4 +641,75 @@ func (s *Server) handleBindRedis(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, result)
+}
+
+func (s *Server) handleServerInfo(c *gin.Context) {
+	// Get server PID
+	serverInfo := api.ServerInfo{
+		PID: os.Getpid(),
+	}
+
+	// Get data directory
+	dataDir, _ := configmanager.GetSystemConfig("data_dir")
+	if dataDir == "" {
+		dataDir = "."
+	}
+	if absDir, err := filepath.Abs(dataDir); err == nil {
+		dataDir = absDir
+	}
+	serverInfo.DataDir = dataDir
+
+	// Get log directory
+	logDir := filepath.Join(dataDir, "logs")
+	serverInfo.LogDir = logDir
+
+	// Get config path
+	configPath := filepath.Join(dataDir, "config.json")
+	serverInfo.ConfigPath = configPath
+
+	// Get version from git or build
+	serverInfo.Version = getVersion()
+
+	// Get uptime - get process start time
+	if p, err := process.NewProcess(int32(os.Getpid())); err == nil {
+		if createTime, err := p.CreateTime(); err == nil {
+			// Convert milliseconds to seconds
+			startTime := createTime / 1000
+			uptime := time.Now().Unix() - startTime
+			serverInfo.Uptime = uptime
+		}
+	}
+
+	c.JSON(http.StatusOK, api.Response{Success: true, Data: serverInfo})
+}
+
+// getVersion returns the version of glow-server
+func getVersion() string {
+	// Try to get version from git describe
+	if _, err := exec.LookPath("git"); err == nil {
+		// Check if we're in a git repository
+		dir, _ := os.Getwd()
+		for {
+			if _, err := os.Stat(filepath.Join(dir, ".git")); err == nil {
+				// Found .git, run git describe
+				cmd := exec.Command("git", "describe", "--tags", "--abbrev=0")
+				cmd.Dir = dir
+				if output, err := cmd.Output(); err == nil {
+					version := string(output)
+					// Trim whitespace and 'v' prefix if present
+					version = fmt.Sprintf("%s", version)
+					return version
+				}
+				break
+			}
+			parent := filepath.Dir(dir)
+			if parent == dir {
+				break
+			}
+			dir = parent
+		}
+	}
+
+	// Fallback to runtime version
+	return fmt.Sprintf("%s (%s/%s)", "dev", runtime.GOOS, runtime.GOARCH)
 }

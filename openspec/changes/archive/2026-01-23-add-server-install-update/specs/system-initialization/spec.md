@@ -148,10 +148,6 @@
 - **THEN** 用户应以前台方式执行 `glow-server serve` 启动服务
 - **AND** `glow` 命令应可使用已写入的默认 context 访问本机服务
 
-## RENAMED Requirements
-- FROM: `### Requirement: 交互式安装 (Interactive Install)`
-- TO: `### Requirement: 安装入口 (Installer Entry)`
-
 ## MODIFIED Requirements
 
 ### Requirement: 安装入口 (Installer Entry)

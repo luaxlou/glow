@@ -70,7 +70,30 @@ Glow SDK 提供了一系列标准化的 Starter 组件。
 *   **Get(key string, target interface{})**: 获取配置项（从 `<appName>_local_config.json` 读取）。
 *   **IsSet(key string) bool**: 检查配置项是否存在。
 
-配置文件由 `glow apply` 命令生成，包含应用元数据和资源绑定信息（如 MySQL DSN、Redis 地址等）。
+**声明式配置管理**:
+- 配置通过 `app.yaml` 的 `spec.config` 字段声明
+- 执行 `glow apply -f app.yaml` 生成本地配置文件
+- 配置文件包含：
+  - 用户在 `spec.config` 中声明的自定义配置
+  - 资源绑定自动生成的连接信息（MySQL DSN、Redis addr 等）
+
+示例 - 在 app.yaml 中声明配置：
+
+```yaml
+apiVersion: v1
+kind: App
+metadata:
+  name: my-app
+spec:
+  config:
+    log_level: debug
+    max_connections: 100
+    feature_flags:
+      new_ui: true
+
+```
+
+应用配置文件由 `glow apply` 命令生成，包含应用元数据和资源绑定信息（如 MySQL DSN、Redis 地址等）。
 
 ### 3.4 GlowMySQL (数据库 - 基于 GORM)
 

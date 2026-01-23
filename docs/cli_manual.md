@@ -67,11 +67,26 @@ glow context use prod
 
 ### 配置管理 (Configuration)
 
-查看和管理应用配置。
+Glow 采用**完全声明式的配置管理**。所有应用配置通过 `app.yaml` 声明，使用 `glow apply` 应用。
 
-*   **`glow get config <app>`**: 查看应用的配置（JSON 格式）。
+*   **配置声明**: 在 `app.yaml` 的 `spec.config` 字段中声明配置
+*   **应用配置**: 执行 `glow apply -f app.yaml` 应用配置
+*   **查看配置**: 读取生成的 `<data-dir>/apps/<app>/<app>_local_config.json`
 
-**注意**: 配置更新通过 `glow apply -f app.yaml` 完成，不再支持在线编辑。
+**配置管理原则**:
+- ✅ 配置即代码：所有配置在 YAML 文件中管理
+- ✅ 版本控制：配置变更可通过 Git 追踪
+- ✅ 不可变性：不支持运行时通过命令行修改配置
+- ❌ 已移除：`glow config set/get/list/export/edit` 等命令
+
+### 服务器管理 (Server Management)
+
+查看和管理 glow-server 的运行状态。
+
+*   **`glow server info`**: 显示服务器信息（人类可读格式）
+    *   显示 PID、数据目录、日志目录、配置路径
+    *   显示服务器版本和运行时长
+*   **`glow server info --json`**: 以 JSON 格式输出服务器信息
 
 ### 环境管理 (Context)
 

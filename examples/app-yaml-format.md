@@ -83,6 +83,26 @@ env:
 - `mysql`: MySQL 数据库列表
 - `redis`: Redis 缓存列表
 
+### 8. config（可选）
+
+**默认值**: `{}`（空 map）
+
+**说明**: 应用配置，会写入到 `<data-dir>/apps/<app-name>/<app-name>_local_config.json`
+
+**示例**:
+```yaml
+config:
+  mysql_dsn: "user:pass@tcp(localhost:3306)/dbname"
+  redis_addr: "localhost:6379"
+  log_level: "debug"
+  max_connections: 100
+```
+
+**配置文件生成**:
+- 执行 `glow apply` 时会自动生成配置文件
+- 文件路径: `<data-dir>/apps/<app-name>/<app-name>_local_config.json`
+- 应用可以使用 SDK 读取这些配置
+
 ## 最小化配置示例
 
 ### 最小配置
@@ -144,6 +164,13 @@ spec:
     - name: ENV
       value: production
 
+  # 应用配置（可选）
+  config:
+    mysql_dsn: "user:pass@tcp(localhost:3306)/dbname"
+    redis_addr: "localhost:6379"
+    log_level: "info"
+    max_connections: 100
+
   # HTTP 服务（可选）
   port: 33203               # 可选，默认: 0（不开放端口）
 
@@ -201,17 +228,17 @@ glow get app my-app
 **内容示例**:
 ```json
 {
-  "mysql": {
-    "dsn": "user:pass@tcp(localhost:3306)/myapp_db"
-  },
-  "redis": {
-    "addr": "localhost:6379",
-    "username": "",
-    "password": "",
-    "db": 0
-  }
+  "mysql_dsn": "user:pass@tcp(localhost:3306)/myapp_db",
+  "redis_addr": "localhost:6379",
+  "log_level": "info",
+  "max_connections": 100
 }
 ```
+
+**配置来源**:
+1. 来自 `app.yaml` 中的 `spec.config` 字段
+2. 来自绑定的资源（MySQL、Redis）自动生成的连接信息
+3. 两者会合并，资源配置会覆盖 `spec.config` 中的同名配置
 
 ## 应用读取配置
 
@@ -249,6 +276,7 @@ func main() {
 | `spec.workingDir` | `<data-dir>/apps/<name>` | 工作目录 |
 | `spec.args` | `[]` | 命令行参数 |
 | `spec.env` | `{}` | 环境变量 |
+| `spec.config` | `{}` | 应用配置 |
 | `spec.port` | `0` | HTTP 端口（0=不开放） |
 | `spec.domain` | 空 | 域名绑定 |
 | `spec.resources` | 不绑定 | 资源绑定 |

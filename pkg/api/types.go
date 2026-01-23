@@ -210,6 +210,16 @@ type NginxSystemConfig struct {
 	UpdatedAt  interface{} `json:"updated_at" yaml:"updated_at"`
 }
 
+// ServerInfo contains information about the glow-server instance
+type ServerInfo struct {
+	PID         int    `json:"pid"`
+	DataDir     string `json:"data_dir"`
+	LogDir      string `json:"log_dir"`
+	ConfigPath  string `json:"config_path"`
+	Version     string `json:"version"`
+	Uptime      int64  `json:"uptime"` // uptime in seconds
+}
+
 // Host Manifest (Old) - Keep for backward compatibility or refactor
 type Host struct {
 	TypeMeta `yaml:",inline"`

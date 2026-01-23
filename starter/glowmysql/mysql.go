@@ -6,7 +6,6 @@ import (
 	"log"
 	"sync"
 
-	"github.com/luaxlou/glow/starter/glowapp"
 	"github.com/luaxlou/glow/starter/glowapp/config"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -78,13 +77,6 @@ func Gorm() (*gorm.DB, error) {
 	db = sqlDB
 	initialized = true
 	log.Println("MySQL Starter initialized successfully.")
-
-	glowapp.RegisterCleanup("MySQL Starter", func() {
-		if db != nil {
-			log.Println("Closing MySQL connection...")
-			db.Close()
-		}
-	})
 
 	return gdb, nil
 }

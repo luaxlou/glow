@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/luaxlou/glow/starter/glowapp"
 	_ "modernc.org/sqlite"
 )
 
@@ -101,13 +100,6 @@ func DB() (*sql.DB, error) {
 	db = conn
 	initialized = true
 	log.Println("SQLite Starter initialized successfully.")
-
-	glowapp.RegisterCleanup("SQLite Starter", func() {
-		if db != nil {
-			log.Println("Closing SQLite connection...")
-			db.Close()
-		}
-	})
 
 	return db, nil
 }

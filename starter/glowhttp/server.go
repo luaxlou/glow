@@ -1,17 +1,13 @@
 package glowhttp
 
 import (
-	"context"
 	"log"
 	"net/http"
 	"os"
 	"strconv"
-	"strings"
 	"sync"
-	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/luaxlou/glow/starter/glowapp"
 )
 
 var (
@@ -49,7 +45,6 @@ func Router() *gin.Engine {
 
 // Run starts the HTTP server on the configured port.
 // It returns immediately, running the server in a goroutine.
-// Lifecycle is managed by glowapp.
 func Run() {
 	if !initialized {
 		// Initialize if not already done (e.g. user didn't add any routes but just wants to start)
@@ -76,17 +71,6 @@ func Run() {
 		}
 	}
 
-	// Report to glowapp
-	// Extract port number
-	portNumStr := strings.TrimPrefix(port, ":")
-	if portNum, err := strconv.Atoi(portNumStr); err == nil {
-		domain := os.Getenv("OP_APP_DOMAIN")
-		if domain == "" {
-			domain = os.Getenv("DOMAIN")
-		}
-		glowapp.SetInfo(portNum, domain)
-	}
-
 	srv := &http.Server{
 		Addr:    port,
 		Handler: engine,
@@ -98,13 +82,4 @@ func Run() {
 			log.Fatalf("listen: %s\n", err)
 		}
 	}()
-
-	glowapp.RegisterCleanup("HTTP Starter", func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		if err := srv.Shutdown(ctx); err != nil {
-			log.Printf("Server forced to shutdown: %v", err)
-		}
-		log.Println("HTTP Server exiting")
-	})
 }

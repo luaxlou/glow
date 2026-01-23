@@ -43,11 +43,19 @@ Contains:
 
 ## How It Works
 
-When users run `glow init` and choose to configure Claude Code integration:
+When users run the Glow project initialization script with AI tool integration:
 
-1. All three skills are automatically copied from `.claude/skills/` to the project's `.claude/skills/` directory
+1. All three skills are automatically copied from the Glow installation's `.claude/skills/` to the project's `.claude/skills/` directory
 2. Claude Code will automatically load the appropriate skill based on the task
 3. Each skill provides focused, domain-specific knowledge
+
+To initialize a new project with Claude Code support:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/luaxlou/glow/main/scripts/init-project.sh | bash
+```
+
+The script will prompt you about configuring AI tool integration. Choose "y" for Claude Code to copy these skills to your project.
 
 ## Skill Structure
 
@@ -70,7 +78,7 @@ When users run `glow init` and choose to configure Claude Code integration:
 
 ## Development
 
-If you update any of the skill files in this directory, users will get the updated version the next time they run `glow init`.
+If you update any of the skill files in this directory, users will get the updated version the next time they initialize a project using the online script.
 
 ## Testing
 
@@ -81,7 +89,7 @@ To test the skill integration:
 mkdir test-project && cd test-project
 
 # Initialize with Claude Code support
-glow init
+curl -fsSL https://raw.githubusercontent.com/luaxlou/glow/main/scripts/init-project.sh | bash
 # Choose "y" when asked about Claude Code integration
 
 # Verify the skills were copied
@@ -106,7 +114,7 @@ ls -la .claude/skills/
 
 ## Related Files
 
-- `cmd/glow/cmd/init.go`: Contains the logic to copy skills during `glow init`
+- `scripts/init-project.sh`: Contains the logic to copy skills during project initialization
 - `.gitignore`: Updated to include `.claude/` (skills are part of the repository)
 - `docs/`: Official documentation (more detailed, user-facing)
 

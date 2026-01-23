@@ -41,10 +41,6 @@ var rootCmd = &cobra.Command{
 		if cmd.Name() == "help" {
 			return nil
 		}
-		// Local-only command: should work without server context
-		if cmd.Name() == "init" {
-			return nil
-		}
 		if cmd.Parent() != nil && (cmd.Parent().Name() == "auth" || cmd.Parent().Name() == "context") {
 			return nil
 		}

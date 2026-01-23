@@ -6,7 +6,6 @@ import (
 	"log"
 	"sync"
 
-	"github.com/luaxlou/glow/starter/glowapp"
 	"github.com/luaxlou/glow/starter/glowapp/config"
 	"github.com/redis/go-redis/v9"
 )
@@ -15,7 +14,16 @@ var (
 	client      *redis.Client
 	initialized bool
 	mu          sync.RWMutex
+	declared    bool
 )
+
+// Init declares that the application will use Redis.
+// This should be called during application startup, similar to other starters.
+func Init() {
+	mu.Lock()
+	defer mu.Unlock()
+	declared = true
+}
 
 // Client returns the automatically initialized Redis client.
 func Client() (*redis.Client, error) {
@@ -73,13 +81,6 @@ func Client() (*redis.Client, error) {
 	client = c
 	initialized = true
 	log.Println("Redis Starter initialized successfully.")
-
-	glowapp.RegisterCleanup("Redis Starter", func() {
-		if client != nil {
-			log.Println("Closing Redis client...")
-			client.Close()
-		}
-	})
 
 	return client, nil
 }
