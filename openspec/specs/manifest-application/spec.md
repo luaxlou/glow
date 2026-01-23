@@ -12,7 +12,7 @@ TBD - created by archiving change remove-appcenter-decouple-apps. Update Purpose
 - **THEN** CLI 应解析该文件并将应用元数据与资源需求同步至服务端
 
 ### Requirement: App Apply 文件字段 (App Apply File Fields)
-`kind: App` 的 manifest MUST 支持以下字段，以满足“开放端口、执行参数、绑定域名、资源需求”的声明：
+`kind: App` 的 manifest MUST 支持以下字段：
 
 #### Scenario: App 字段示例与语义
 - **GIVEN** 一个 `kind: App` manifest
@@ -21,9 +21,7 @@ TBD - created by archiving change remove-appcenter-decouple-apps. Update Purpose
   - `spec.port`: 开放端口（可选；**缺省时视为不开放端口**）
   - `spec.args`: 执行参数数组（可选）
   - `spec.domain`: 绑定域名（可选）
-  - `spec.config`: 应用配置 map（可选；用户可声明任意配置项）
-  - `spec.resources.mysql[]`: MySQL 资源需求数组（可选；每项 MUST 仅包含 `dbName`）
-  - `spec.resources.redis[]`: Redis 资源需求数组（可选；每项包含 `db` 字段）
+  - `spec.config`: 应用配置 map（可选；用户可声明所有配置项，包括数据库连接等）
 
 #### Scenario: 声明式应用配置
 - **GIVEN** 一个 `kind: App` manifest 包含 `spec.config` 字段
@@ -31,8 +29,7 @@ TBD - created by archiving change remove-appcenter-decouple-apps. Update Purpose
 - **THEN** 系统应将 `spec.config` 中的配置保存到服务端存储
 - **AND** 系统应自动调用 `/config/<appName>/render` 生成本地配置文件
 - **AND** 配置文件 MUST 包含 `spec.config` 中声明的所有配置项
-- **AND** 资源绑定的配置（如 MySQL DSN、Redis addr）会与 `spec.config` 合并
-- **AND** 资源绑定配置 MAY 覆盖 `spec.config` 中的同名配置项
+- **AND** 应用可以在 `spec.config` 中声明任意配置，包括 MySQL DSN、Redis addr 等
 
 #### Scenario: 未指定 port 时不开放端口
 - **GIVEN** 一个 `kind: App` manifest 未设置 `spec.port`
@@ -41,12 +38,14 @@ TBD - created by archiving change remove-appcenter-decouple-apps. Update Purpose
 - **AND** 系统 MUST NOT 为该应用分配端口
 - **AND** 系统 MUST NOT 注入 `OP_APP_PORT`（或等价端口注入机制）
 
-### Requirement: App 资源需求到配置的映射 (Resources-to-Config Mapping)
-当 App manifest 声明资源需求时，系统 MUST 将资源供给结果映射为应用配置，并支持后续将配置落盘为本地配置文件。
+### Requirement: 配置即代码 (Configuration as Code)
+系统 MUST 支持将所有应用配置（包括数据库连接、缓存配置等）在 `spec.config` 中声明。
 
-#### Scenario: MySQL 资源需求映射到 `mysql.dsn`
-- **WHEN** `kind: App` manifest 包含 `spec.resources.mysql[].dbName`
-- **THEN** 系统应为该 dbName 创建/复用 MySQL 资源与凭据
-- **AND** 系统应将结果写入应用配置中的 `mysql.dsn`
-- **AND** 系统应支持通过 `/config/<appName>/render` 将最新配置落盘为 `<appName>_local_config.json`
+#### Scenario: 声明所有配置
+- **GIVEN** 一个 `kind: App` manifest
+- **WHEN** 用户在 `spec.config` 中声明所有需要的配置
+  - 例如：MySQL DSN、Redis 地址、日志级别等
+- **THEN** 系统应将这些配置写入 `<appName>_local_config.json`
+- **AND** 应用启动时从本地配置文件读取所有配置
+- **AND** 系统 MUST NOT 提供独立的资源绑定机制
 

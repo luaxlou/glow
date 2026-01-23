@@ -2,13 +2,15 @@
 
 ## 概述
 
-`glow apply` 是 Glow 框架中**唯一的资源配置方式**。通过声明式 YAML 文件，你可以一次性配置应用的所有资源（端口、域名、MySQL、Redis 等）。
+`glow apply` 是 Glow 框架中**唯一的应用配置方式**。通过声明式 YAML 文件，你可以配置应用的所有方面（执行参数、环境变量、端口、域名、应用配置等）。
+
+Glow 采用"配置即代码"的设计理念：所有配置在 `spec.config` 字段中声明，用户自行提供数据库连接等基础设施配置，系统只负责配置文件生成和管理。
 
 ## 核心概念
 
 ### 声明式配置
 
-所有资源配置都在 YAML 文件中声明，而不是通过命令行参数或交互式配置：
+所有配置都在 YAML 文件中声明，而不是通过命令行参数或交互式配置：
 
 ```yaml
 apiVersion: v1
@@ -18,21 +20,27 @@ metadata:
 spec:
   port: 8080          # 端口
   domain: app.local   # 域名
-  resources:         # 资源
-    mysql:
-      - dbName: mydb
+  config:             # 应用配置 ⭐
+    mysql_dsn: "user:pass@tcp(localhost:3306)/mydb"
+    redis_addr: "localhost:6379"
+    log_level: "info"
 ```
+
+**配置即代码原则**：
+- 所有配置（包括数据库连接、缓存配置等）都在 `spec.config` 中声明
+- 用户自行提供数据库连接等基础设施配置
+- 系统将配置写入本地 JSON 文件供应用读取
 
 ### 幂等性
 
 可以重复执行 `glow apply`，每次执行都会：
-- 更新应用配置
-- 重新绑定资源（如果需要）
+- 更新应用元数据
 - 重新生成配置文件
+- 如果应用正在运行且配置变化，自动重启应用
 
 ### 原子性
 
-所有资源在一次 `apply` 中配置，要么全部成功，要么全部失败。
+所有配置在一次 `apply` 中完成，要么全部成功，要么全部失败。
 
 ## 命令语法
 
@@ -70,7 +78,7 @@ kind: App
 metadata:
   name: my-web-app
 spec:
-  # 执行配置
+  # 执行配置（可选，有约定值）
   binary: ./my-app              # 应用二进制路径
   workingDir: /path/to/work     # 工作目录
   args: ["--server", "--v"]     # 启动参数
@@ -84,12 +92,21 @@ spec:
   port: 8080                    # HTTP 端口（可选）
   domain: myapp.example.com     # 域名绑定（可选）
 
-  # 资源声明
-  resources:
-    mysql:
-      - dbName: myapp_db        # MySQL 数据库
-    redis:
-      - db: 0                   # Redis 实例
+  # 应用配置（所有配置在这里声明）⭐
+  config:
+    # 数据库配置（用户自行提供）
+    mysql_dsn: "user:pass@tcp(localhost:3306)/myapp_db"
+
+    # 缓存配置（用户自行提供）
+    redis_addr: "localhost:6379"
+    redis_password: ""
+
+    # 应用配置
+    log_level: "info"
+    max_connections: 100
+
+    # 功能开关
+    feature_new_ui: true
 ```
 
 ## 字段说明
@@ -111,18 +128,23 @@ metadata:
   name: 123app        # ❌ 错误（以数字开头）
 ```
 
-### spec.binary（必需）
+### spec.binary（可选）
 
 应用二进制文件的路径。
 
+**默认值**: `<data-dir>/apps/<app-name>/<app-name>`
+
 **相对路径**: 相对于工作目录
 **绝对路径**: 从根目录开始
+
+**约定大于配置**: 大多数情况下可以省略此字段，系统会自动使用约定路径。
 
 **示例**:
 ```yaml
 spec:
   binary: ./my-app           # 相对路径
   binary: /usr/bin/my-app    # 绝对路径
+  # binary:                  # 省略时使用约定值
 ```
 
 ### spec.workingDir（可选）
@@ -207,45 +229,65 @@ spec:
       value: "8080"
 ```
 
-### spec.resources（可选）
+### spec.config（可选）⭐
 
-资源声明（MySQL、Redis 等）。
+应用配置，包括数据库连接、缓存配置、应用参数等所有配置项。
 
-#### MySQL 资源
+**默认值**: `{}`（空 map）
 
+**重要**: 这是声明所有应用配置的唯一方式。
+
+**示例**:
 ```yaml
-resources:
-  mysql:
-    - dbName: myapp_db           # 必需：数据库名
-      existingPassword: "..."     # 可选：现有数据库密码
+spec:
+  config:
+    # 数据库配置（用户自行提供）
+    mysql_dsn: "user:pass@tcp(localhost:3306)/mydb"
+
+    # Redis 配置（用户自行提供）
+    redis_addr: "localhost:6379"
+    redis_password: ""
+    redis_db: 0
+
+    # 应用配置
+    log_level: "debug"
+    max_connections: 100
+    timeout: 30
+
+    # 功能开关
+    feature_new_ui: true
+    feature_cache: false
+
+    # 自定义配置
+    app_name: "My App"
+    admin_email: "admin@example.com"
 ```
 
-**行为**:
-- 如果数据库不存在，自动创建并生成随机密码
-- 如果数据库存在且 `existingPassword` 为空，返回错误
-- 如果数据库存在且提供 `existingPassword`，使用现有凭据
-
-**多数据库**:
-```yaml
-resources:
-  mysql:
-    - dbName: main_db
-    - dbName: cache_db
-    - dbName: log_db
+**配置文件生成**:
+执行 `glow apply` 后，配置会写入到：
+```
+<data-dir>/apps/<app-name>/<app-name>_local_config.json
 ```
 
-#### Redis 资源
+**配置来源**:
+1. 完全来自 `app.yaml` 中的 `spec.config` 字段
+2. 用户自行提供所有配置值（包括数据库连接等）
+3. 系统不提供自动化的配置生成或资源创建
 
-```yaml
-resources:
-  redis:
-    - db: 0                    # Redis 数据库编号（默认 0）
-      password: "..."           # 可选：密码（不指定则不使用）
+**应用读取配置**:
+应用使用 SDK 读取本地配置文件：
+```go
+import "github.com/luaxlou/glow/starter/glowapp/config"
+
+func main() {
+    // 读取配置
+    mysqlDSN := config.GetString("mysql_dsn")
+    redisAddr := config.GetString("redis_addr")
+    logLevel := config.GetString("log_level")
+
+    // 使用配置...
+}
 ```
-
-**行为**:
-- 连接到本地 Redis（localhost:6379）
-- 使用指定的数据库编号
 
 ## 执行流程
 
@@ -265,33 +307,29 @@ resources:
 
 **配置文件位置**: `/etc/nginx/sites-available/<app-name>`
 
-### 4. 绑定资源
+### 4. 生成配置文件
 
-依次处理 `resources` 中声明的所有资源：
+将 `spec.config` 中的所有配置写入本地配置文件。
 
-- **MySQL**: 创建数据库（如果不存在），生成或验证凭据
-- **Redis**: 验证 Redis 连接
-
-### 5. 生成配置文件
-
-将所有资源配置写入本地配置文件。
-
-**配置文件位置**: `/var/lib/glow-server/apps/<app-name>/<app-name>_local_config.json`
+**配置文件位置**: `<data-dir>/apps/<app-name>/<app-name>_local_config.json`
 
 **示例内容**:
 ```json
 {
-  "mysql": {
-    "dsn": "glow_myapp:random@tcp(localhost:3306)/glow_myapp_db"
-  },
-  "redis": {
-    "addr": "localhost:6379",
-    "username": "",
-    "password": "",
-    "db": 0
-  }
+  "mysql_dsn": "user:pass@tcp(localhost:3306)/mydb",
+  "redis_addr": "localhost:6379",
+  "redis_password": "",
+  "log_level": "info",
+  "max_connections": 100,
+  "feature_new_ui": true
 }
 ```
+
+**注意**: 配置内容完全来自 `spec.config`，系统不会自动生成任何配置。
+
+### 5. 自动重启（如果需要）
+
+如果应用正在运行且配置文件发生变化，自动重启应用以使新配置生效。
 
 ### 6. 输出摘要
 
@@ -306,10 +344,6 @@ Applying App 'my-app' from app.yaml...
 ✓ App 'my-app' registered successfully
 → Configuring Ingress for domain: myapp.example.com
 ✓ Ingress configured: http://myapp.example.com -> port 8080
-→ Binding MySQL resources...
-✓ MySQL 'myapp_db' bound successfully (DSN: ****)
-→ Binding Redis resources...
-✓ Redis (db 0) bound successfully (Addr: localhost:6379)
 → Generating config file...
 ✓ Config file written to: /var/lib/glow-server/apps/my-app/my-app_local_config.json (245 bytes)
 
@@ -317,22 +351,31 @@ Summary:
   App Name: my-app
   Port: 8080
   Domain: myapp.example.com
-  MySQL: 1 database(s)
-  Redis: 1 instance(s)
+  Status: Config updated (no restart needed)
 
 Next steps:
   1. Review the config file generated
-  2. Start the app: glow start app my-app
+  2. If the app is not running, start it: glow start app my-app
   3. Check status: glow get app my-app
 ```
 
-### 需要凭据的输出
+### 配置变更后自动重启
 
 ```
-→ Binding MySQL resources...
-→ MySQL 'existing_db' requires credentials
-Enter existing MySQL password: *****
-✓ MySQL 'existing_db' bound successfully (DSN: ****)
+Applying App 'my-app' from app.yaml...
+✓ App 'my-app' registered successfully
+→ Configuring Ingress for domain: myapp.example.com
+✓ Ingress configured: http://myapp.example.com -> port 8080
+→ Generating config file...
+✓ Config file written to: /var/lib/glow-server/apps/my-app/my-app_local_config.json (256 bytes)
+→ Config changed, restarting app 'my-app'...
+✓ App 'my-app' restarted successfully
+
+Summary:
+  App Name: my-app
+  Port: 8080
+  Domain: myapp.example.com
+  Status: Restarted (config changed)
 ```
 
 ## 错误处理
@@ -363,15 +406,7 @@ Validation error: spec.port is required when spec.domain is specified
 
 **解决**: 删除 `domain` 或添加 `port`。
 
-#### 4. MySQL 需要凭据
-
-```
-⚠ Warning: MySQL 'mydb' binding failed: needs_credentials
-```
-
-**解决**: 在 YAML 中添加 `existingPassword` 或在 CLI 交互时输入密码。
-
-#### 5. API 路由不存在 (404)
+#### 4. API 路由不存在 (404)
 
 ```
 Error: server returned status 404
@@ -392,11 +427,10 @@ spec:
   binary: ./web-app
   port: 8080
   domain: myapp.example.com
-  resources:
-    mysql:
-      - dbName: webapp_db
-    redis:
-      - db: 0
+  config:
+    mysql_dsn: "user:pass@tcp(localhost:3306)/webapp_db"
+    redis_addr: "localhost:6379"
+    log_level: "info"
 ```
 
 ### 场景 2: 后台 Worker
@@ -409,9 +443,9 @@ metadata:
 spec:
   binary: ./worker
   # 不指定 port，不对外开放
-  resources:
-    mysql:
-      - dbName: worker_db
+  config:
+    mysql_dsn: "user:pass@tcp(localhost:3306)/worker_db"
+    queue_name: "tasks"
 ```
 
 ### 场景 3: 微服务（多应用共享数据库）
@@ -425,11 +459,10 @@ metadata:
 spec:
   binary: ./api-service
   port: 8080
-  resources:
-    mysql:
-      - dbName: shared_db
-    redis:
-      - db: 0
+  config:
+    mysql_dsn: "user:pass@tcp(localhost:3306)/shared_db"
+    redis_addr: "localhost:6379"
+    redis_db: 0
 
 # worker.yaml
 apiVersion: v1
@@ -438,11 +471,10 @@ metadata:
   name: worker
 spec:
   binary: ./worker
-  resources:
-    mysql:
-      - dbName: shared_db    # 共享同一数据库
-    redis:
-      - db: 1                # 不同的 Redis DB
+  config:
+    mysql_dsn: "user:pass@tcp(localhost:3306)/shared_db"  # 共享同一数据库
+    redis_addr: "localhost:6379"
+    redis_db: 1  # 不同的 Redis DB
 ```
 
 ### 场景 4: 更新应用配置
@@ -451,11 +483,11 @@ spec:
 # 1. 编辑 YAML
 vim app.yaml
 
-# 2. 应用新配置
+# 2. 应用新配置（如果应用运行且配置变化，会自动重启）
 glow apply -f app.yaml
 
-# 3. 重启应用使新配置生效
-glow restart app my-app
+# 3. 检查应用状态
+glow get app my-app
 ```
 
 ## 最佳实践
@@ -493,17 +525,14 @@ python3 -c "import yaml; yaml.safe_load(open('app.yaml'))"
 
 ### 4. 渐进式更新
 
-先更新资源，再重启应用：
+更新配置时会自动处理重启：
 
 ```bash
-# Step 1: 更新配置（不影响运行中的应用）
+# 更新配置（如果应用运行且配置变化，会自动重启）
 glow apply -f app.yaml
 
-# Step 2: 检查生成的配置
+# 检查生成的配置
 cat /var/lib/glow-server/apps/my-app/my-app_local_config.json
-
-# Step 3: 重启应用
-glow restart app my-app
 ```
 
 ### 5. 配置审查
@@ -512,25 +541,33 @@ glow restart app my-app
 
 - [ ] 端口正确
 - [ ] 域名正确
-- [ ] 资源绑定成功
 - [ ] 配置文件已生成
+- [ ] 应用状态正确
 
 ## 高级用法
 
-### 1. 多个 MySQL 数据库
+### 1. 多数据库配置
+
+在 `spec.config` 中配置多个数据库连接：
 
 ```yaml
-resources:
-  mysql:
-    - dbName: main_db
-    - dbName: cache_db
-    - dbName: log_db
+spec:
+  config:
+    # 主数据库
+    mysql_dsn: "user:pass@tcp(localhost:3306)/main_db"
+
+    # 缓存数据库
+    mysql_cache_dsn: "user:pass@tcp(localhost:3306)/cache_db"
+
+    # 日志数据库
+    mysql_log_dsn: "user:pass@tcp(localhost:3306)/log_db"
 ```
 
 应用中访问：
 ```go
-glowmysql.Init("main_db")   // 使用 main_db
-glowmysql.Init("cache_db")  // 使用 cache_db
+config.GetString("mysql_dsn")       // 主数据库
+config.GetString("mysql_cache_dsn") // 缓存数据库
+config.GetString("mysql_log_dsn")   // 日志数据库
 ```
 
 ### 2. 环境变量注入
@@ -540,6 +577,8 @@ spec:
   env:
     - name: MYSQL_DSN
       value: "mysql://user:pass@localhost/dbname"
+    - name: REDIS_ADDR
+      value: "localhost:6379"
 ```
 
 ### 3. 条件配置（使用注释）
@@ -548,14 +587,13 @@ spec:
 spec:
   port: 8080
   # domain: myapp.local    # 取消注释以启用域名
-  resources:
-    mysql:
-      - dbName: myapp_db
-  # redis:                  # 取消注释以启用 Redis
-  #   - db: 0
+
+  config:
+    mysql_dsn: "user:pass@tcp(localhost:3306)/myapp_db"
+    # redis_addr: "localhost:6379"  # 取消注释以启用 Redis
 ```
 
-### 4. 组合配置（包含 args 和 env）
+### 4. 组合配置（包含 args、env 和 config）
 
 ```yaml
 spec:
@@ -566,12 +604,39 @@ spec:
       value: production
     - name: PORT
       value: "8080"
+
   port: 8080
   domain: myapp.local
-  resources:
-    mysql:
-      - dbName: myapp_db
+
+  config:
+    mysql_dsn: "user:pass@tcp(localhost:3306)/myapp_db"
+    redis_addr: "localhost:6379"
+    log_level: "info"
 ```
+
+### 5. 配置优先级
+
+配置值的优先级（从高到低）：
+
+1. **环境变量** (spec.env) - 直接注入到进程环境
+2. **配置文件** (spec.config) - 写入本地 JSON 配置文件
+3. **命令行参数** (spec.args) - 传递给应用的启动参数
+
+示例：
+```yaml
+spec:
+  args: ["--port=8080"]
+  env:
+    - name: APP_PORT
+      value: "8080"
+  config:
+    port: 8080
+```
+
+应用可以这样读取：
+- 命令行参数：`os.Args`
+- 环境变量：`os.Getenv("APP_PORT")`
+- 配置文件：`config.GetInt("port")`
 
 ## 与其他命令的配合
 
@@ -619,19 +684,29 @@ cd /var/lib/glow-server/apps/my-app
 ./my-app --help
 ```
 
-### 问题 2: MySQL 绑定失败
+**常见原因**:
+- 配置文件中的数据库连接字符串不正确
+- 端口被占用
+- 二进制文件不存在或无执行权限
+
+### 问题 2: 数据库连接失败
 
 **排查步骤**:
 ```bash
 # 检查 MySQL 服务
 sudo systemctl status mysql
 
-# 测试 MySQL 连接
-mysql -u root -p -e "SHOW DATABASES;"
+# 测试 MySQL 连接（使用配置文件中的 DSN）
+mysql -u user -p -e "SHOW DATABASES;"
 
-# 检查生成的 DSN
-cat /var/lib/glow-server/apps/my-app/my-app_local_config.json | grep dsn
+# 检查配置文件中的 DSN
+cat /var/lib/glow-server/apps/my-app/my-app_local_config.json | grep mysql_dsn
 ```
+
+**解决方案**:
+- 确认 MySQL 服务运行正常
+- 验证 `spec.config.mysql_dsn` 配置正确
+- 确认数据库已创建
 
 ### 问题 3: Ingress 不工作
 
@@ -661,10 +736,16 @@ ping myapp.local
 
 `glow apply` 是配置 Glow 应用的**唯一方式**。通过声明式 YAML 文件，你可以：
 
-✅ 一次性配置所有资源
+✅ 配置应用的所有方面（执行、环境变量、端口、域名、应用配置等）
 ✅ 版本控制配置文件
 ✅ 幂等更新应用配置
-✅ 自动绑定 MySQL/Redis
-✅ 自动配置 Ingress
+✅ 自动配置 Ingress（域名绑定）
+✅ 自动重启应用（配置变更时）
 
-记住：**所有资源配置都在 YAML 中完成，不需要独立的 `glow app add mysql` 等命令**。
+**配置即代码原则**：
+- 所有配置在 `spec.config` 字段中声明
+- 用户自行提供数据库连接等基础设施配置
+- 系统将配置写入本地 JSON 文件供应用读取
+- 不提供独立的资源绑定或配置生成机制
+
+记住：**所有应用配置都在 YAML 的 `spec.config` 中完成，不需要独立的配置命令或资源绑定命令**。

@@ -100,7 +100,7 @@ Glow 采用**完全声明式的配置管理**。所有应用配置通过 `app.ya
 
 ### 新架构工作流
 
-**重要**: Glow 现在使用声明式配置模型。应用不再在运行时连接服务器申请资源。
+**重要**: Glow 现在使用"配置即代码"模型。所有配置（包括数据库连接）都在 YAML 文件中声明，用户自行提供数据库连接等基础设施配置。
 
 #### 配置阶段
 
@@ -115,20 +115,19 @@ spec:
   binary: ./my-app
   port: 8080
   domain: myapp.example.com
-  resources:
-    mysql:
-      - dbName: myapp_db
+  config:
+    mysql_dsn: "user:pass@tcp(localhost:3306)/myapp_db"
+    log_level: "info"
 EOF
 
-# 2. 应用配置（一次性完成所有资源绑定）
+# 2. 应用配置
 glow apply -f app.yaml
 ```
 
 **执行结果**:
 - ✅ 应用元数据已注册
-- ✅ MySQL 数据库已创建
 - ✅ Ingress（域名）已配置
-- ✅ 配置文件已生成
+- ✅ 配置文件已生成（包含用户提供的 mysql_dsn）
 
 #### 运行阶段
 
@@ -152,7 +151,7 @@ glow logs my-app
 
 **新工作流（当前）**:
 ```bash
-glow apply -f app.yaml     # ✅ 预先配置资源
+glow apply -f app.yaml     # ✅ 声明配置（用户自行提供数据库连接等）
 glow start app my-app      # ✅ 启动应用
 ```
 
@@ -171,11 +170,10 @@ spec:
   binary: ./my-web-app
   port: 8080
   domain: myapp.example.com
-  resources:
-    mysql:
-      - dbName: myapp_db
-    redis:
-      - db: 0
+  config:
+    mysql_dsn: "user:pass@tcp(localhost:3306)/myapp_db"
+    redis_addr: "localhost:6379"
+    log_level: "info"
 EOF
 
 # 2. 应用配置
@@ -249,9 +247,9 @@ metadata:
 spec:
   binary: ./my-worker
   # 不指定 port
-  resources:
-    mysql:
-      - dbName: worker_db
+  config:
+    mysql_dsn: "user:pass@tcp(localhost:3306)/worker_db"
+    queue_name: "tasks"
 EOF
 
 # 应用并启动
@@ -270,11 +268,10 @@ metadata:
 spec:
   binary: ./api-service
   port: 8080
-  resources:
-    mysql:
-      - dbName: shared_db
-    redis:
-      - db: 0
+  config:
+    mysql_dsn: "user:pass@tcp(localhost:3306)/shared_db"
+    redis_addr: "localhost:6379"
+    redis_db: 0
 ```
 
 ```yaml
@@ -285,11 +282,10 @@ metadata:
   name: worker
 spec:
   binary: ./worker
-  resources:
-    mysql:
-      - dbName: shared_db  # 共享同一数据库
-    redis:
-      - db: 1              # 不同的 Redis DB
+  config:
+    mysql_dsn: "user:pass@tcp(localhost:3306)/shared_db"  # 共享同一数据库
+    redis_addr: "localhost:6379"
+    redis_db: 1  # 不同的 Redis DB
 ```
 
 ```bash
@@ -323,8 +319,6 @@ Applying App 'my-app' from app.yaml...
 ✓ App 'my-app' registered successfully
 → Configuring Ingress for domain: myapp.example.com
 ✓ Ingress configured: http://myapp.example.com -> port 8080
-→ Binding MySQL resources...
-✓ MySQL 'myapp_db' bound successfully (DSN: ****)
 → Generating config file...
 ✓ Config file written to: /var/lib/glow-server/apps/my-app/my-app_local_config.json
 
@@ -332,7 +326,6 @@ Summary:
   App Name: my-app
   Port: 8080
   Domain: myapp.example.com
-  MySQL: 1 database(s)
 
 Next steps:
   1. Review the config file generated
@@ -385,9 +378,9 @@ Resources:
 
 Config:
   {
-    "mysql": {
-      "dsn": "glow_myapp:***@tcp(localhost:3306)/glow_myapp_db"
-    }
+    "mysql_dsn": "user:***@tcp(localhost:3306)/myapp_db",
+    "redis_addr": "localhost:6379",
+    "log_level": "info"
   }
 ```
 
@@ -489,11 +482,10 @@ spec:
   env:                          # 可选：环境变量
     - name: ENV
       value: production
-  resources:                    # 可选：资源声明
-    mysql:
-      - dbName: myapp_db       # MySQL 数据库
-    redis:
-      - db: 0                   # Redis 实例
+  config:                       # 应用配置（所有配置在这里声明）⭐
+    mysql_dsn: "user:pass@tcp(localhost:3306)/myapp_db"
+    redis_addr: "localhost:6379"
+    log_level: "info"
 ```
 
 **详细说明**: 参见 [Glow Apply 手册](glow_apply_manual.md)
@@ -515,17 +507,23 @@ sudo pkill -f glow-server
 sudo ./glow-server serve
 ```
 
-### 问题 2: MySQL 绑定失败
+### 问题 2: 数据库连接失败
 
-**症状**: `MySQL binding failed: needs_credentials`
+**症状**: 应用启动失败，日志中显示数据库连接错误
 
-**解决**: 在 app.yaml 中添加密码：
-```yaml
-resources:
-  mysql:
-    - dbName: existing_db
-      existingPassword: "your-password"
+**排查步骤**:
+```bash
+# 1. 检查 MySQL 服务
+sudo systemctl status mysql
+
+# 2. 检查配置文件中的 DSN
+cat /var/lib/glow-server/apps/my-app/my-app_local_config.json | grep mysql_dsn
+
+# 3. 测试数据库连接
+mysql -u user -p -h localhost -e "SELECT 1;"
 ```
+
+**解决**: 确保 `spec.config.mysql_dsn` 配置正确
 
 ### 问题 3: 应用启动失败
 
@@ -571,20 +569,26 @@ spec:
       value: "sk-xxxxxx"
 ```
 
-### 多数据库
+### 多数据库配置
 
 ```yaml
-resources:
-  mysql:
-    - dbName: main_db
-    - dbName: cache_db
-    - dbName: log_db
+spec:
+  config:
+    # 主数据库
+    mysql_dsn: "user:pass@tcp(localhost:3306)/main_db"
+
+    # 缓存数据库
+    mysql_cache_dsn: "user:pass@tcp(localhost:3306)/cache_db"
+
+    # 日志数据库
+    mysql_log_dsn: "user:pass@tcp(localhost:3306)/log_db"
 ```
 
 应用中访问：
 ```go
-glowmysql.Init("main_db")   // 使用 main_db
-glowmysql.Init("cache_db")  // 使用 cache_db
+config.GetString("mysql_dsn")       // 主数据库
+config.GetString("mysql_cache_dsn") // 缓存数据库
+config.GetString("mysql_log_dsn")   // 日志数据库
 ```
 
 ### 条件配置（使用注释）
@@ -593,11 +597,9 @@ glowmysql.Init("cache_db")  // 使用 cache_db
 spec:
   port: 8080
   # domain: myapp.local    # 取消注释以启用
-  resources:
-    mysql:
-      - dbName: myapp_db
-  # redis:                  # 取消注释以启用
-  #   - db: 0
+  config:
+    mysql_dsn: "user:pass@tcp(localhost:3306)/myapp_db"
+    # redis_addr: "localhost:6379"  # 取消注释以启用 Redis
 ```
 
 ## 9. 最佳实践

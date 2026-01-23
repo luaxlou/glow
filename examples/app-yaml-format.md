@@ -75,33 +75,42 @@ env:
 **说明**:
 - 指定后，glow-server 自动配置 Nginx 反向代理
 
-### 7. resources（可选）
-
-**默认值**: 不绑定任何资源
-
-**支持**:
-- `mysql`: MySQL 数据库列表
-- `redis`: Redis 缓存列表
-
-### 8. config（可选）
+### 7. config（可选）⭐
 
 **默认值**: `{}`（空 map）
 
 **说明**: 应用配置，会写入到 `<data-dir>/apps/<app-name>/<app-name>_local_config.json`
 
+**重要**: 这是声明所有配置的唯一方式，包括数据库连接、缓存配置等。
+
 **示例**:
 ```yaml
 config:
-  mysql_dsn: "user:pass@tcp(localhost:3306)/dbname"
+  # 数据库配置
+  mysql_dsn: "user:pass@tcp(localhost:3306)/mydb"
+
+  # Redis 配置
   redis_addr: "localhost:6379"
+  redis_password: ""
+
+  # 应用配置
   log_level: "debug"
   max_connections: 100
+
+  # 功能开关
+  feature_new_ui: true
+  feature_cache: false
 ```
 
 **配置文件生成**:
 - 执行 `glow apply` 时会自动生成配置文件
 - 文件路径: `<data-dir>/apps/<app-name>/<app-name>_local_config.json`
 - 应用可以使用 SDK 读取这些配置
+
+**配置方式说明**:
+- ✅ **推荐**: 所有配置在 `spec.config` 中声明
+- ❌ **已移除**: `spec.resources` 字段（不再支持资源绑定）
+- 用户自行管理数据库连接等基础设施配置
 
 ## 最小化配置示例
 
@@ -127,7 +136,7 @@ spec:
   port: 33203
 ```
 
-### 带域名和资源的配置
+### 带端口和配置
 
 ```yaml
 apiVersion: v1
@@ -136,12 +145,10 @@ metadata:
   name: my-app
 spec:
   port: 33203
-  domain: myapp.example.com
-  resources:
-    mysql:
-      - dbName: myapp_db
-    redis:
-      - db: 0
+  config:
+    log_level: info
+    mysql_dsn: "user:pass@tcp(localhost:3306)/mydb"
+    redis_addr: "localhost:6379"
 ```
 
 ### 完整配置
@@ -164,25 +171,27 @@ spec:
     - name: ENV
       value: production
 
-  # 应用配置（可选）
+  # 应用配置（可选）⭐
   config:
+    # 数据库配置
     mysql_dsn: "user:pass@tcp(localhost:3306)/dbname"
+
+    # 缓存配置
     redis_addr: "localhost:6379"
+    redis_password: ""
+
+    # 应用配置
     log_level: "info"
     max_connections: 100
+
+    # 功能开关
+    feature_new_ui: true
 
   # HTTP 服务（可选）
   port: 33203               # 可选，默认: 0（不开放端口）
 
   # Ingress（可选）
   domain: myapp.example.com # 可选，需要同时指定 port
-
-  # 资源（可选）
-  resources:
-    mysql:
-      - dbName: myapp_db
-    redis:
-      - db: 0
 ```
 
 ## 部署流程
@@ -228,17 +237,24 @@ glow get app my-app
 **内容示例**:
 ```json
 {
-  "mysql_dsn": "user:pass@tcp(localhost:3306)/myapp_db",
+  "mysql_dsn": "user:pass@tcp(localhost:3306)/mydb",
   "redis_addr": "localhost:6379",
+  "redis_password": "",
   "log_level": "info",
-  "max_connections": 100
+  "max_connections": 100,
+  "feature_new_ui": true
 }
 ```
 
 **配置来源**:
 1. 来自 `app.yaml` 中的 `spec.config` 字段
-2. 来自绑定的资源（MySQL、Redis）自动生成的连接信息
-3. 两者会合并，资源配置会覆盖 `spec.config` 中的同名配置
+2. 用户在 `spec.config` 中声明所有需要的配置
+3. 不再提供独立的资源绑定或配置生成机制
+
+**说明**:
+- 用户自行管理数据库连接等基础设施配置
+- 系统只负责将配置写入本地 JSON 文件
+- 应用启动时从本地配置文件读取所有配置
 
 ## 应用读取配置
 
@@ -276,10 +292,9 @@ func main() {
 | `spec.workingDir` | `<data-dir>/apps/<name>` | 工作目录 |
 | `spec.args` | `[]` | 命令行参数 |
 | `spec.env` | `{}` | 环境变量 |
-| `spec.config` | `{}` | 应用配置 |
+| `spec.config` | `{}` | **应用配置 ⭐** |
 | `spec.port` | `0` | HTTP 端口（0=不开放） |
 | `spec.domain` | 空 | 域名绑定 |
-| `spec.resources` | 不绑定 | 资源绑定 |
 
 ## 优势
 
@@ -287,3 +302,4 @@ func main() {
 2. **一致性**: 所有应用遵循相同的目录结构
 3. **可预测**: 配置路径和行为都是可预测的
 4. **灵活性**: 需要时可以覆盖默认值
+5. **配置即代码**: 所有配置在 YAML 中声明，便于版本控制
