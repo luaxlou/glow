@@ -81,10 +81,25 @@ detect_platform() {
 # Get latest release version
 get_latest_version() {
     log_info "Fetching latest release version..."
-    VERSION=$(curl -s https://api.github.com/repos/${REPO}/releases/latest | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/' | sed 's/^v//')
+
+    # Method 1: Try GitHub API (may hit rate limits)
+    VERSION=$(curl -s https://api.github.com/repos/${REPO}/releases/latest 2>/dev/null | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/' | sed 's/^v//')
+
+    # Method 2: Fallback to git tags (if API fails)
+    if [ -z "$VERSION" ]; then
+        log_warn "GitHub API rate limited or unavailable, trying alternative method..."
+        VERSION=$(curl -s https://raw.githubusercontent.com/${REPO}/main/VERSION 2>/dev/null || echo "")
+
+        # Method 3: Last resort - try to parse from git refs
+        if [ -z "$VERSION" ]; then
+            log_warn "VERSION file not found, trying git refs API..."
+            VERSION=$(curl -s "https://api.github.com/repos/${REPO}/git/refs/tags" 2>/dev/null | grep '"ref"' | tail -1 | sed -E 's/.*refs\/tags\/v([^"]+)".*/\1/')
+        fi
+    fi
 
     if [ -z "$VERSION" ]; then
         log_error "Failed to fetch latest version"
+        log_error "Please specify version manually or check your internet connection"
         exit 1
     fi
 
