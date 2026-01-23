@@ -163,13 +163,18 @@ main() {
 
     check_prerequisites
 
-    # Step 1: Commit and push (if not skipped)
+    # Step 1: Update VERSION file and commit (if not skipped)
     if [ "$SKIP_COMMIT" = false ]; then
-        print_step "Step 1: Commit and Push"
+        print_step "Step 1: Update VERSION and Commit"
         echo ""
 
-        # Check if there are uncommitted changes
-        if [ -n "$(git status --porcelain)" ]; then
+        # Update VERSION file
+        VERSION_NO_V=${VERSION#v}
+        print_info "Updating VERSION file to $VERSION_NO_V..."
+        echo "$VERSION_NO_V" > VERSION
+
+        # Check if there are other uncommitted changes
+        if [ -n "$(git status --porcelain | grep -v VERSION)" ]; then
             print_warn "You have uncommitted changes"
             read -p "Do you want to commit them now? (y/n) " -n 1 -r
             echo
@@ -191,6 +196,11 @@ main() {
                 print_error "Cannot proceed with uncommitted changes"
                 exit 1
             fi
+        else
+            # Only VERSION file changed
+            print_info "Committing VERSION file..."
+            git add VERSION
+            git commit -m "chore: update VERSION to $VERSION_NO_V"
         fi
 
         # Check if tag already exists
