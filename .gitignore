@@ -37,3 +37,6 @@ glow.db
 *.log
 glow
 glow-server
+
+# Build output
+dist/
