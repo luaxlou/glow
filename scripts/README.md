@@ -4,104 +4,73 @@ This directory contains utility scripts for Glow development and release managem
 
 ## Quick Start
 
-### Creating a Complete Release
+### Complete Release Workflow (One Command)
 
 ```bash
-# 1. Build binaries for all platforms
-./scripts/build.sh
-
-# 2. Create the release
-./scripts/release.sh --version v1.0.0 --title "Version 1.0.0"
-
-# 3. Upload binaries to release
-./scripts/upload-assets.sh v1.0.0
+# Everything in one command!
+./scripts/release.sh --version v1.0.0-beta.6
 ```
 
-Or manually:
+That's it! This single command will:
+1. ✅ Build binaries for all platforms
+2. ✅ Commit and push changes (if needed)
+3. ✅ Create GitHub release
+4. ✅ Upload all assets
+
+### Advanced Usage
 
 ```bash
-# Build and upload in one command
-./scripts/build.sh && gh release upload v1.0.0 ./dist/* --clobber
+# Release with custom notes
+./scripts/release.sh \
+  --version v1.0.0 \
+  --title "Version 1.0.0" \
+  --notes /tmp/release_notes.md
+
+# Pre-release
+./scripts/release.sh \
+  --version v1.0.0-beta.7 \
+  --pre-release
+
+# Skip commit (if already pushed)
+./scripts/release.sh \
+  --version v1.0.0-beta.7 \
+  --skip-commit
+
+# Use existing binaries (already built)
+./scripts/release.sh \
+  --version v1.0.0 \
+  --skip-build
 ```
 
-## Build Script
-
-**`build.sh`** - Compile glow-server and glow CLI for multiple platforms
-
-### Platforms Supported
-
-- darwin/amd64 (macOS Intel)
-- darwin/arm64 (macOS Apple Silicon)
-- linux/amd64 (Linux Intel)
-- linux/arm64 (Linux ARM)
-
-### Usage
-
-```bash
-./scripts/build.sh
-```
-
-### Output
-
-Binaries are created in `./dist/` directory:
-- `glow-server-{os}-{arch}` - Server binaries
-- `glow-{os}-{arch}` - CLI binaries
-- `SHA256SUMS.txt` - Checksums for verification
-
-### Example
-
-```bash
-$ ./scripts/build.sh
-
-[INFO] Glow Build Script
-[INFO] Version: v1.0.0-beta.6
-[INFO] Building for darwin/arm64...
-[INFO] ✓ Built: glow-server-darwin-arm64
-[INFO] ✓ Built: glow-darwin-arm64
-...
-[INFO] Build completed!
-```
-
-## Upload Assets Script
-
-**`upload-assets.sh`** - Upload compiled binaries to GitHub release
-
-### Usage
-
-```bash
-./scripts/upload-assets.sh <version> [dist-directory]
-```
-
-### Examples
-
-```bash
-# Upload binaries for v1.0.0
-./scripts/upload-assets.sh v1.0.0
-
-# Upload from custom directory
-./scripts/upload-assets.sh v1.0.0 ./dist
-
-# Or use gh CLI directly
-gh release upload v1.0.0 ./dist/* --clobber
-```
-
-### What It Does
-
-- Finds all binaries in the dist directory
-- Uploads them to the specified GitHub release
-- Includes SHA256SUMS.txt for verification
+---
 
 ## Release Script
 
-**`release.sh`** - Automated release script for creating GitHub releases
+**`release.sh`** - Complete release automation
 
-### Features
+### What It Does
 
-- Validates Git status (checks for uncommitted changes)
-- Creates Git tag
-- Pushes changes and tags to GitHub
-- Creates GitHub release with notes
-- Supports pre-release and draft releases
+The `release.sh` script handles the entire release process:
+
+1. **Commit & Push** (optional)
+   - Checks for uncommitted changes
+   - Prompts for commit message if needed
+   - Pushes to GitHub
+   - Creates version tag
+
+2. **Build Binaries** (optional)
+   - Compiles for 4 platforms: darwin/amd64, darwin/arm64, linux/amd64, linux/arm64
+   - Builds both glow-server and glow CLI
+   - Generates SHA256 checksums
+
+3. **Create Release**
+   - Creates GitHub release with tag
+   - Generates release notes from git log (or custom notes)
+   - Supports pre-release and draft releases
+
+4. **Upload Assets**
+   - Uploads all compiled binaries
+   - Includes SHA256SUMS.txt
 
 ### Usage
 
@@ -111,172 +80,317 @@ gh release upload v1.0.0 ./dist/* --clobber
 
 ### Options
 
-- `-v, --version VERSION` - Version tag (required, e.g., v1.0.0-beta.6)
-- `-t, --title TITLE` - Release title (optional)
-- `-n, --notes FILE` - Release notes file in markdown (optional)
-- `-p, --pre-release` - Mark as pre-release
-- `-d, --draft` - Create as draft
-- `-h, --help` - Show help message
+| Option | Description |
+|--------|-------------|
+| `-v, --version VERSION` | Version tag (required, e.g., v1.0.0-beta.6) |
+| `-t, --title TITLE` | Release title (optional) |
+| `-n, --notes FILE` | Release notes file in markdown (optional) |
+| `-p, --pre-release` | Mark as pre-release |
+| `-d, --draft` | Create as draft |
+| `--skip-build` | Skip building binaries (use existing ./dist) |
+| `--skip-commit` | Skip commit/push (assume already done) |
+| `-h, --help` | Show help message |
 
 ### Examples
 
-#### Basic Release
+#### Standard Release
 
 ```bash
-./scripts/release.sh --version v1.0.0
+./scripts/release.sh --version v1.0.0-beta.6
 ```
 
-#### Pre-release with Notes
+**Output**:
+```
+[INFO] Glow Complete Release
+[INFO] Version:     v1.0.0-beta.6
+[INFO] Pre-release: false
+
+[STEP] Step 1: Commit and Push
+[INFO] Pushing to GitHub...
+
+[STEP] Step 2: Build Binaries
+[INFO] Building glow-server-darwin-arm64...
+[INFO] Building glow-darwin-arm64...
+...
+[INFO] Build completed!
+
+[STEP] Step 3: Create GitHub Release
+[INFO] Creating GitHub release...
+
+[STEP] Step 4: Upload Release Assets
+[INFO] Files to upload: 8
+[INFO] Uploading glow-server-darwin-arm64...
+✓ Uploaded: glow-server-darwin-arm64
+...
+
+[INFO] Release Completed Successfully!
+[INFO] URL: https://github.com/luaxlou/glow/releases/tag/v1.0.0-beta.6
+```
+
+#### Pre-release with Custom Notes
 
 ```bash
+# Prepare release notes
+cat > /tmp/v1.0.0-beta.7.md << EOF
+# v1.0.0-beta.7
+
+## New Features
+- Feature 1
+- Feature 2
+
+## Bug Fixes
+- Fix 1
+EOF
+
+# Create release
 ./scripts/release.sh \
   --version v1.0.0-beta.7 \
-  --title "Beta 7 - Bug Fixes" \
-  --notes /tmp/release_notes.md \
+  --title "Beta 7 - New Features" \
+  --notes /tmp/v1.0.0-beta.7.md \
   --pre-release
 ```
 
-#### Draft Release
+#### Incremental Release (Already Committed)
 
 ```bash
+# If you've already pushed changes and just need to build/upload
+./scripts/release.sh \
+  --version v1.0.0-beta.7 \
+  --skip-commit
+```
+
+#### Use Existing Binaries
+
+```bash
+# If you've already built binaries in ./dist
 ./scripts/release.sh \
   --version v1.0.0 \
-  --title "Version 1.0.0" \
-  --notes release-notes.md \
-  --draft
+  --skip-build
 ```
 
-### Workflow
+### Workflow Options
 
-1. **Prepare release notes** (optional):
-   ```bash
-   # Create release notes file
-   cat > /tmp/v1.0.0-notes.md << EOF
-   # v1.0.0
+The script provides flexibility for different workflows:
 
-   ## New Features
-   - Feature 1
-   - Feature 2
-
-   ## Bug Fixes
-   - Fix 1
-   EOF
+1. **Complete Release** (default)
+   ```
+   Commit → Push → Build → Create Release → Upload
    ```
 
-2. **Run release script**:
-   ```bash
-   ./scripts/release.sh \
-     --version v1.0.0 \
-     --title "Version 1.0.0" \
-     --notes /tmp/v1.0.0-notes.md
+2. **Skip Commit** (use `--skip-commit`)
+   ```
+   Build → Create Release → Upload
    ```
 
-3. **Script will**:
-   - Check for uncommitted changes
-   - Prompt to commit if needed
-   - Push changes to GitHub
-   - Create and push Git tag
-   - Create GitHub release
+3. **Skip Build** (use `--skip-build`)
+   ```
+   Create Release → Upload
+   ```
 
-### Automatic Release Notes
+4. **Skip Both** (use `--skip-commit --skip-build`)
+   ```
+   Create Release → Upload (fastest if everything is ready)
+   ```
 
-If you don't provide a `--notes` file, the script will automatically generate release notes from the Git commit log since the last tag.
+---
 
-### Requirements
+## Individual Build Tools
 
-- Git
-- GitHub CLI (`gh`)
+The following scripts are also available for individual use:
+
+### `build.sh`
+
+Separate build script if you only want to compile binaries:
+
+```bash
+./scripts/build.sh
+```
+
+**Output**: Creates binaries in `./dist/`
+
+### `upload-assets.sh`
+
+Separate upload script if you only want to upload:
+
+```bash
+./scripts/upload-assets.sh v1.0.0-beta.6 ./dist
+```
+
+**Note**: Most users should use `release.sh` instead, which combines all steps.
+
+---
+
+## Supported Platforms
+
+Binaries are built for the following platforms:
+
+| Platform | Architecture | Binary Name |
+|----------|-------------|-------------|
+| macOS | Intel (amd64) | `glow-server-darwin-amd64`, `glow-darwin-amd64` |
+| macOS | Apple Silicon (arm64) | `glow-server-darwin-arm64`, `glow-darwin-arm64` |
+| Linux | Intel (amd64) | `glow-server-linux-amd64`, `glow-linux-amd64` |
+| Linux | ARM (arm64) | `glow-server-linux-arm64`, `glow-linux-arm64` |
+
+---
+
+## Requirements
+
+### For Building
+
+- **Go** 1.18+ (for compiling binaries)
+- **Git** (for version control)
+
+### For Releasing
+
+- **GitHub CLI** (`gh`) - [Install](https://cli.github.com/)
 - Authenticated GitHub session (`gh auth login`)
 
-### Installation
+### Check Prerequisites
 
 ```bash
-# Install GitHub CLI (if not installed)
-# On macOS:
-brew install gh
+# Check Go
+go version
 
-# On Linux:
-# See https://cli.github.com/
+# Check GitHub CLI
+gh version
 
-# Authenticate
-gh auth login
+# Check authentication
+gh auth status
 ```
 
-### Color Output
+---
 
-The script uses colored output:
-- 🟢 Green - Info messages
-- 🟡 Yellow - Warnings
-- 🔴 Red - Errors
+## Complete Example
 
-### Error Handling
-
-The script will:
-- Exit on any error (`set -e`)
-- Validate version format
-- Check for existing tags
-- Verify GitHub authentication
-- Confirm before creating release
-
-### Version Format
-
-Versions must follow semantic versioning:
-- `v1.0.0` - Standard release
-- `v1.0.0-beta.1` - Pre-release
-- `v1.0.0-rc.1` - Release candidate
-- `v1.0.0-alpha.1` - Alpha release
-
-### Related Commands
+Here's a complete example of creating a release from scratch:
 
 ```bash
-# List all releases
-gh release list
+# 1. Make your changes
+vim cmd/glow/cmd/apply.go
 
-# View specific release
-gh release view v1.0.0
+# 2. Test locally
+go test ./...
+go run cmd/glow/main.go version
 
-# Delete a release (and tag)
-gh release delete v1.0.0 --yes
-git tag -d v1.0.0
-git push origin :refs/tags/v1.0.0
+# 3. Run the release script
+./scripts/release.sh \
+  --version v1.0.0-beta.7 \
+  --title "Beta 7 - Bug Fixes" \
+  --pre-release
 
-# Edit release notes
-gh release edit v1.0.0 --notes-file new-notes.md
+# That's it! The script will:
+# - Prompt for commit message if needed
+# - Build all binaries
+# - Create GitHub release
+# - Upload everything
+# - Show you the release URL
 ```
 
-### Troubleshooting
+---
 
-**Tag already exists**:
+## Troubleshooting
+
+### "Tag already exists"
+
 ```bash
 # Delete local and remote tag
 git tag -d v1.0.0
 git push origin :refs/tags/v1.0.0
 ```
 
-**Not authenticated**:
+### "Go not installed"
+
 ```bash
-# Re-authenticate
-gh auth logout
+# Install Go
+# On macOS:
+brew install go
+
+# On Linux:
+# See https://golang.org/dl/
+```
+
+### "Not authenticated with gh"
+
+```bash
+# Authenticate
 gh auth login
 ```
 
-**Push failed**:
-```bash
-# Check remote
-git remote -v
+### Build failed
 
-# Ensure you have access to the repository
-gh repo view
+```bash
+# Check Go version
+go version
+
+# Clean and retry
+rm -rf ./dist
+./scripts/release.sh --version v1.0.0
 ```
 
-## Future Scripts
+---
 
-Additional utility scripts may be added in the future:
+## Best Practices
 
-- `build.sh` - Build all Glow components
-- `test.sh` - Run comprehensive tests
-- `install.sh` - Install Glow locally
-- `clean.sh` - Clean build artifacts
+### 1. Version Numbering
+
+Follow semantic versioning:
+- `v1.0.0` - Stable release
+- `v1.0.0-beta.1` - Pre-release
+- `v1.0.0-rc.1` - Release candidate
+- `v1.0.0-alpha.1` - Alpha release
+
+### 2. Release Notes
+
+Always provide meaningful release notes:
+```bash
+./scripts/release.sh \
+  --version v1.0.0 \
+  --notes RELEASE_NOTES.md
+```
+
+### 3. Test Before Release
+
+Always test before creating a release:
+```bash
+# Run tests
+go test ./...
+
+# Build locally
+go build -o test-binary ./cmd/glow
+
+# Test the binary
+./test-binary version
+```
+
+### 4. Pre-release Testing
+
+Use pre-release for beta testing:
+```bash
+./scripts/release.sh \
+  --version v1.0.0-beta.7 \
+  --pre-release
+```
+
+Then promote to stable:
+```bash
+./scripts/release.sh \
+  --version v1.0.0 \
+  --title "Stable Release 1.0.0"
+```
+
+---
+
+## Installation Script
+
+Users can install Glow using the installation script:
+
+```bash
+curl -fsSL "https://raw.githubusercontent.com/luaxlou/glow/main/scripts/install-local.sh" | bash
+```
+
+This script downloads the appropriate binaries for their platform from the latest GitHub release.
+
+---
 
 ## Contributing
 
@@ -287,3 +401,38 @@ When adding new scripts:
 3. Include error handling
 4. Follow existing code style
 5. Update this README
+
+---
+
+## Related Commands
+
+```bash
+# List all releases
+gh release list
+
+# View specific release
+gh release view v1.0.0
+
+# Download release assets
+gh release download v1.0.0
+
+# Delete a release
+gh release delete v1.0.0 --yes
+git tag -d v1.0.0
+git push origin :refs/tags/v1.0.0
+
+# Edit release notes
+gh release edit v1.0.0 --notes-file new-notes.md
+```
+
+---
+
+## Summary
+
+**For most users, just run:**
+
+```bash
+./scripts/release.sh --version v1.0.0
+```
+
+That one command handles everything!
