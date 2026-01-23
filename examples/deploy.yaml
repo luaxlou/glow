@@ -1,23 +1,26 @@
 # Glow App 配置文件 - Simple App 示例
 #
 # 使用方法：
-#   1. glow apply -f deploy.yaml         # 应用配置并绑定资源
-#   2. glow start app simple-app         # 启动应用
-#   3. curl http://app.local            # 访问应用（需配置 /etc/hosts）
+#   1. 将编译好的二进制文件放到：/var/lib/glow-server/apps/simple-app/simple-app
+#   2. glow apply -f deploy.yaml         # 应用配置并绑定资源
+#   3. glow start app simple-app         # 启动应用
+#   4. curl http://app.local            # 访问应用（需配置 /etc/hosts）
 #
 # 说明：
 # - 这是 simple-app 的完整配置示例
 # - 包含 HTTP 服务、Ingress（域名绑定）和 MySQL 数据库
 # - 所有资源通过声明式 YAML 配置
+# - binary 和 workingDir 采用约定大于配置原则（可省略）
 
 apiVersion: v1
 kind: App
 metadata:
   name: simple-app
 spec:
-  # 应用执行配置
-  binary: ./simple-app
-  workingDir: .
+  # 应用执行配置（约定大于配置）
+  # binary: 默认为 <data-dir>/apps/<app-name>/<app-name>
+  # workingDir: 默认为 <data-dir>/apps/<app-name>
+  # 因此可以省略这两个字段
 
   # HTTP 服务端口
   # 应用通过 glowhttp.Init(33203) 声明端口

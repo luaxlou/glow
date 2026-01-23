@@ -68,8 +68,12 @@
   - 根据 `spec.domain` 自动处理 Ingress（创建/更新 Nginx 配置）
   - 根据 `spec.resources` 逐项调用资源绑定 API（MySQL/Redis）
   - 调用 `POST /config/:app/render` 生成/更新 `<appName>_local_config.json`
-  - 输出明确结果（变更摘要、写入路径、下一步建议如 `glow start app <name>`）
-  - ✅ Implemented in `applyApp()` and `handleResources()`
+  - **重要**: MUST NOT 启动应用（不执行 deploy 动作）
+  - 若应用配置有变化（diff 检测），自动重启该应用（如果应用正在运行）
+  - 若应用配置无变化，保持应用当前状态（不改变运行状态）
+  - 输出明确结果（变更摘要、写入路径、是否触发重启）
+  - ✅ Implemented in `applyApp()` and `handleResources()` in `cmd/glow/cmd/apply.go:182-242`
+  - ✅ ConfigHash tracking implemented in `internal/apiserver/server.go:278-282`
 - [x] 3.1.4 处理"需要凭据"的交互：在 CLI 侧安全读取密码并重试（不回显、不落日志）。
   - ✅ Implemented in `handleResources()` with `promptForPassword()`
 

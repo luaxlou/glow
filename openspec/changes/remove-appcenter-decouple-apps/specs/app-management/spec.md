@@ -56,4 +56,7 @@
 - **WHEN** 用户通过 Glow CLI 执行 `glow apply -f app.yaml`（`kind: App`）
 - **THEN** 系统应创建/更新该应用的元数据记录
 - **AND** 后续 `glow get app` 应能展示该应用（即使应用当前未运行）
+- **AND** `glow apply` MUST NOT 启动应用（不执行 deploy 动作）
+- **AND** 若应用配置有变化（diff 检测），系统应自动重启该应用
+- **AND** 若应用配置无变化，系统应保持应用当前状态（不改变运行状态）
 

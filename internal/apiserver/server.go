@@ -111,6 +111,7 @@ func (s *Server) handleUpdateIngress(c *gin.Context) {
 
 type upsertAppRequest struct {
 	Name       string            `json:"name"`
+	Command    string            `json:"command"`
 	Port       int               `json:"port"`
 	Args       []string          `json:"args"`
 	WorkingDir string            `json:"workingDir"`
@@ -148,8 +149,29 @@ func (s *Server) handleUpsertApp(c *gin.Context) {
 		app = &api.AppInfo{Name: name}
 	}
 
+	// Get dataDir for default paths
+	dataDir, _ := configmanager.GetSystemConfig("data_dir")
+	if dataDir == "" {
+		dataDir = "."
+	}
+	if absDir, err := filepath.Abs(dataDir); err == nil {
+		dataDir = absDir
+	}
+	appDir := filepath.Join(dataDir, "apps", name)
+
+	// Convention over configuration: set defaults if not specified
+	if req.Command == "" {
+		// Default to <app-name> binary in app directory
+		req.Command = filepath.Join(appDir, name)
+	}
+	if req.WorkingDir == "" {
+		// Default to app directory
+		req.WorkingDir = appDir
+	}
+
 	// Overwrite declarative fields from apply.
 	app.Name = name
+	app.Command = req.Command
 	app.Port = req.Port
 	app.Args = req.Args
 	app.Domain = req.Domain
@@ -274,6 +296,12 @@ func (s *Server) handleRenderConfig(c *gin.Context) {
 
 	// Calculate simple hash for verification
 	configHash := fmt.Sprintf("%x", md5.Sum(configBytes))
+
+	// Update ConfigHash in AppInfo
+	if app, err := statemanager.GetApp(appName); err == nil {
+		app.ConfigHash = configHash
+		statemanager.SaveApp(*app)
+	}
 
 	c.JSON(http.StatusOK, api.Response{
 		Success: true,

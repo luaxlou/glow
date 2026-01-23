@@ -15,6 +15,7 @@
 - **WHEN** 用户再次执行 `glow apply -f app.yaml`（声明相同的 MySQL dbName 需求）
 - **THEN** 系统应返回成功
 - **AND** 生成的配置文件内容应保持一致（除非凭据/host 发生变化）
+- **AND** 若配置有变化且应用正在运行，系统应自动重启应用
 
 #### Scenario: MySQL 未集成时返回可操作错误
 - **GIVEN** glow-server 未集成 MySQL
