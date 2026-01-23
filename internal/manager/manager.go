@@ -16,11 +16,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/luaxlou/glow/internal/appcenter"
 	"github.com/luaxlou/glow/internal/configmanager"
 	"github.com/luaxlou/glow/internal/statemanager"
 	"github.com/luaxlou/glow/pkg/api"
-	"github.com/shirou/gopsutil/v3/process"
 )
 
 var (
@@ -42,8 +40,6 @@ func StartApp(req api.StartAppRequest) error {
 	if absDir, err := filepath.Abs(dataDir); err == nil {
 		dataDir = absDir
 	}
-
-	serverURL, _ := configmanager.GetSystemConfig("server_url")
 
 	var existingRestartCount int
 	var existingDomain string
@@ -86,40 +82,12 @@ func StartApp(req api.StartAppRequest) error {
 		}
 	}
 
+	// Port semantics:
+	// - If an app explicitly declares an open port (via apply / metadata), it will be stored in DB and reused here.
+	// - If no port is declared, the app is treated as "not exposing a port" and the server MUST NOT auto-allocate one.
 	port := 0
-	var err error
 	if existingApp != nil && existingApp.Port != 0 {
 		port = existingApp.Port
-	} else {
-		port, err = GetFreePort()
-	}
-	// Optional port allocation: if not specified in config, try to allocate
-	// But spec says "Make port allocation optional (read from config)".
-	// If OP_APP_PORT env or config exists, use it?
-	// For now, let's keep allocation but maybe skip if config says so?
-	// Simplified: Always allocate for now as per "system MUST allocate" in old spec,
-	// but new spec says "if not specified".
-	// Let's check if config has port.
-
-	// Check if app config has port
-	if cfgVal, ok := configmanager.GetValue(req.Name, "port"); ok {
-		if p, ok := cfgVal.(float64); ok { // JSON numbers are float64
-			port = int(p)
-			err = nil
-		} else if p, ok := cfgVal.(int); ok {
-			port = p
-			err = nil
-		}
-	}
-
-	if port == 0 {
-		if err != nil {
-			return fmt.Errorf("failed to assign port: %w", err)
-		}
-		return fmt.Errorf("failed to assign port")
-	}
-	if err != nil {
-		return fmt.Errorf("failed to assign port: %w", err)
 	}
 
 	// 1. Prepare Directory: apps/<name>
@@ -204,7 +172,8 @@ func StartApp(req api.StartAppRequest) error {
 		Env:          req.Env,
 		Port:         port,
 		Domain:       existingDomain,
-		AutoRestart:  req.AutoRestart,
+		// AutoRestart removed: server no longer keeps apps alive automatically.
+		AutoRestart:  false,
 		RestartCount: existingRestartCount,
 		Status:       "STARTING",
 		ConfigHash:   existingConfigHash,
@@ -215,7 +184,7 @@ func StartApp(req api.StartAppRequest) error {
 		app.WorkingDir = appDir
 	}
 
-	if !req.SkipIngress {
+	if !req.SkipIngress && app.Port != 0 && app.Domain != "" {
 		if err := GenerateNginxConfig(dataDir, NginxConfig{
 			Name:   app.Name,
 			Port:   app.Port,
@@ -232,8 +201,12 @@ func StartApp(req api.StartAppRequest) error {
 	for k, v := range app.Env {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))
 	}
-	cmd.Env = append(cmd.Env, fmt.Sprintf("OP_APP_PORT=%d", port))
-	cmd.Env = append(cmd.Env, fmt.Sprintf("OP_SERVER_URL=%s", serverURL))
+	if port != 0 {
+		cmd.Env = append(cmd.Env, fmt.Sprintf("OP_APP_PORT=%d", port))
+	}
+	if app.Domain != "" {
+		cmd.Env = append(cmd.Env, fmt.Sprintf("OP_APP_DOMAIN=%s", app.Domain))
+	}
 	cmd.Env = append(cmd.Env, fmt.Sprintf("OP_APP_NAME=%s", app.Name))
 
 	// 3. Run as glow user
@@ -419,146 +392,7 @@ func ListApps() []api.AppInfo {
 	if err != nil {
 		return []api.AppInfo{}
 	}
-
-	activeApps := appcenter.GetActiveApps()
-	var result []api.AppInfo
-
-	for _, app := range dbApps {
-		if active, ok := activeApps[app.Name]; ok {
-			// Use active info (which might have fresher data if updated, though mostly PID)
-			// But DB has config/env potentially updated?
-			// Let's assume DB is source of config, AppCenter is source of Liveness/PID
-			app.Status = "RUNNING"
-			app.Pid = active.Pid
-			app.Port = active.Port // Ensure port is also updated from active info if available
-			// We could merge stats here if appcenter had them
-			// Actually, scanAndMonitor updates stats in DB, so dbApps should have them if queried recently.
-			// But scanAndMonitor runs every 5s.
-			// If we want real-time stats on ListApps, we should fetch them now.
-			if proc, err := process.NewProcess(int32(app.Pid)); err == nil {
-				cpu, _ := proc.CPUPercent()
-				mem, _ := proc.MemoryInfo()
-				ioStat, _ := proc.IOCounters()
-				app.Stats.CPUPercent = cpu
-				if mem != nil {
-					app.Stats.MemoryUsage = mem.RSS
-				}
-				if ioStat != nil {
-					app.Stats.IOReadBytes = ioStat.ReadBytes
-					app.Stats.IOWriteBytes = ioStat.WriteBytes
-				}
-			}
-		} else {
-			// Not active
-			if app.Status == "RUNNING" {
-				// It was running but now disconnected?
-				// ListApps is just a view, scanAndMonitor handles the state transition.
-				// But for display, we might want to show it as "UNKNOWN" or keep DB state
-				// Let's keep DB state, monitor will fix it shortly.
-			}
-		}
-		result = append(result, app)
-	}
-	return result
-}
-
-func StartMonitor() {
-	go runMonitor()
-}
-
-func runMonitor() {
-	ticker := time.NewTicker(5 * time.Second)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ticker.C:
-			scanAndMonitor()
-		}
-	}
-}
-
-func scanAndMonitor() {
-	apps, err := statemanager.ListApps()
-	if err != nil {
-		return
-	}
-
-	activeApps := appcenter.GetActiveApps()
-
-	for _, app := range apps {
-		if activeInfo, ok := activeApps[app.Name]; ok {
-			// App is connected to AppCenter -> It is RUNNING
-			app.Status = "RUNNING"
-			app.Pid = activeInfo.Pid
-
-			// Update Stats using PID if process exists locally
-			if app.Pid > 0 {
-				if proc, err := process.NewProcess(int32(app.Pid)); err == nil {
-					cpu, _ := proc.CPUPercent()
-					mem, _ := proc.MemoryInfo()
-					ioStat, _ := proc.IOCounters()
-					createTime, _ := proc.CreateTime()
-
-					app.Stats.CPUPercent = cpu
-					if mem != nil {
-						app.Stats.MemoryUsage = mem.RSS
-					}
-					if ioStat != nil {
-						app.Stats.IOReadBytes = ioStat.ReadBytes
-						app.Stats.IOWriteBytes = ioStat.WriteBytes
-					}
-					app.StartTime = createTime
-				}
-			}
-
-			statemanager.SaveApp(app)
-		} else {
-			// App is NOT connected to AppCenter
-			if app.Status == "RUNNING" || app.Status == "STARTING" {
-				// It should be running but isn't connected -> ERROR (Crash/Disconnect)
-				// Note: STARTING gives it a grace period?
-				// For now, if it's not connected, it's not running.
-				// But StartApp sets status to STARTING then RUNNING.
-				// If we mark ERROR immediately, it might race with startup connection.
-				// Ideally, we should check if process exists by PID from DB if we want to be sure it's not just a network issue?
-				// But user said "use appcenter status". AppCenter status = Connected.
-				// Let's assume if it's not in AppCenter, it's dead.
-
-				// Grace period logic could be added here if needed.
-				// For now, strictly follow "Not in AppCenter = Dead"
-				app.Status = "ERROR"
-				app.Pid = 0
-				statemanager.SaveApp(app)
-			}
-		}
-
-		// Restart Logic
-		if app.AutoRestart && app.Status != "RUNNING" && app.Status != "STOPPED" {
-			if app.RestartCount > 5 {
-				continue
-			}
-
-			fmt.Printf("Restarting app %s (Attempt %d)\n", app.Name, app.RestartCount+1)
-
-			app.RestartCount++
-			statemanager.SaveApp(app)
-
-			req := api.StartAppRequest{
-				Name:        app.Name,
-				Command:     app.Command,
-				Args:        app.Args,
-				WorkingDir:  app.WorkingDir,
-				Env:         app.Env,
-				AutoRestart: app.AutoRestart,
-			}
-
-			go func(r api.StartAppRequest) {
-				if err := StartApp(r); err != nil {
-					log.Printf("Failed to restart app %s: %v", r.Name, err)
-				}
-			}(req)
-		}
-	}
+	return dbApps
 }
 
 func copyFile(src, dst string) error {

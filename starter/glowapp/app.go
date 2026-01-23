@@ -8,7 +8,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/luaxlou/glow/pkg/api"
 	"github.com/luaxlou/glow/starter/glowapp/config"
 )
 
@@ -22,6 +21,8 @@ var (
 	shutdownOnce sync.Once
 	wg           sync.WaitGroup
 
+	// Deprecated: kept for backward compatibility.
+	// Apps no longer register/heartbeat to glow-server at runtime.
 	skipRegistration bool
 )
 
@@ -39,38 +40,12 @@ func Init(appName string, opts ...Option) {
 	for _, opt := range opts {
 		opt()
 	}
-
-	// Register with Server
-	if !skipRegistration {
-		registerApp()
-	}
 }
 
 // SetInfo updates the app info and resends registration
 func SetInfo(p int, d string) {
 	port = p
 	domain = d
-	registerApp()
-}
-
-func registerApp() {
-	// Simple registration with basic info
-	// In real world, we might want to retry or do this periodically (heartbeat)
-	exe, _ := os.Executable()
-	cwd, _ := os.Getwd()
-	info := api.AppInfo{
-		Name:       name,
-		Pid:        os.Getpid(),
-		Status:     "RUNNING",
-		Port:       port,
-		Domain:     domain,
-		Command:    exe,
-		Args:       os.Args[1:],
-		WorkingDir: cwd,
-	}
-
-	config.Start(info)
-	log.Printf("App %s registered (Port: %d).", name, port)
 }
 
 func Name() string {

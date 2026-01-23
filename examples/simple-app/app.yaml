@@ -1,0 +1,50 @@
+# Glow App 配置文件
+#
+# 使用方法：
+#   1. glow apply -f app.yaml          # 应用配置并绑定资源
+#   2. glow start app simple-app       # 启动应用
+#   3. glow get app simple-app         # 查看应用状态
+#
+# 说明：
+# - 应用使用 MySQL 和 HTTP 服务
+# - Ingress（域名绑定）通过 spec.domain 声明
+# - 资源绑定通过 spec.resources 声明
+
+apiVersion: v1
+kind: App
+metadata:
+  name: simple-app
+spec:
+  # 应用执行配置
+  binary: ./simple-app
+  workingDir: /var/lib/glow-server/apps/simple-app
+  args: []
+
+  # 环境变量（可选）
+  env:
+    - name: ENV
+      value: development
+    - name: LOG_LEVEL
+      value: debug
+
+  # HTTP 服务端口
+  # 应用会通过 OP_APP_PORT 环境变量收到端口 33203
+  port: 33203
+
+  # Ingress 配置（可选）
+  # 指定 domain 后，glow-server 会自动配置 Nginx 反向代理
+  domain: app.local
+
+  # 资源声明
+  resources:
+    # MySQL 数据库
+    # 应用代码中使用 glowmysql.Init("simple_app_db")
+    mysql:
+      - dbName: simple_app_db
+        # 可选：指定已存在的 MySQL root 密码（不指定则自动生成）
+        # existingPassword: ""
+
+    # Redis 缓存（示例中未使用，注释掉）
+    # redis:
+    #   - db: 0
+    #     password: ""

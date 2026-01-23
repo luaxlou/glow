@@ -1,16 +1,17 @@
 package apiserver
 
 import (
+	"crypto/md5"
+	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 
 	"github.com/gin-gonic/gin"
-	"github.com/luaxlou/glow/internal/appcenter"
 	"github.com/luaxlou/glow/internal/configmanager"
 	"github.com/luaxlou/glow/internal/manager"
+	"github.com/luaxlou/glow/internal/provisioner"
 	"github.com/luaxlou/glow/internal/statemanager"
 	"github.com/luaxlou/glow/pkg/api"
 	"github.com/shirou/gopsutil/v3/process"
@@ -29,16 +30,24 @@ func (s *Server) RegisterRoutes(r *gin.Engine) {
 	protected := r.Group("/", RequireAPIKey())
 
 	// --- Config Management ---
-	protected.Any("/config/*appName", s.handleConfig)
+	protected.GET("/config/:appName", s.handleGetConfig)
+	protected.PUT("/config/:appName", s.handleUpdateConfig)
+	protected.POST("/config/:appName/render", s.handleRenderConfig) // New: render config to disk
 
 	// --- App Management ---
 	protected.POST("/apps/upload", s.handleUploadApp)
+	protected.PUT("/apps/:name", s.handleUpsertApp) // New: upsert app metadata (apply)
 	protected.POST("/apps/start", s.handleStartApp)
 	protected.POST("/apps/stop", s.handleStopApp)
 	protected.POST("/apps/restart", s.handleRestartApp)
 	protected.POST("/apps/delete", s.handleDeleteApp)
 	protected.GET("/apps/list", s.handleListApps)
+	protected.GET("/apps/:name", s.handleGetApp) // New: get single app details
 	protected.GET("/apps/logs", s.handleAppLogs)
+
+	// --- Resource Binding ---
+	protected.POST("/apps/:appName/resources/mysql", s.handleBindMySQL) // New: bind MySQL resource
+	protected.POST("/apps/:appName/resources/redis", s.handleBindRedis) // New: bind Redis resource
 
 	// --- Node Management ---
 	protected.GET("/node/status", s.handleNodeStatus) // New
@@ -97,13 +106,62 @@ func (s *Server) handleUpdateIngress(c *gin.Context) {
 		statemanager.SaveApp(*app)
 	}
 
-	// Update AppInfo in StateManager
-	if app, err := statemanager.GetApp(req.AppName); err == nil {
-		app.Domain = req.Domain
-		statemanager.SaveApp(*app)
+	c.JSON(http.StatusOK, api.Response{Success: true, Message: "Ingress updated"})
+}
+
+type upsertAppRequest struct {
+	Name       string            `json:"name"`
+	Port       int               `json:"port"`
+	Args       []string          `json:"args"`
+	WorkingDir string            `json:"workingDir"`
+	Domain     string            `json:"domain"`
+	Env        map[string]string `json:"env"`
+}
+
+func (s *Server) handleUpsertApp(c *gin.Context) {
+	name := c.Param("name")
+	var req upsertAppRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, api.Response{Success: false, Message: "Invalid request body"})
+		return
+	}
+	if req.Name != "" && req.Name != name {
+		c.JSON(http.StatusBadRequest, api.Response{Success: false, Message: "name mismatch"})
+		return
 	}
 
-	c.JSON(http.StatusOK, api.Response{Success: true, Message: "Ingress updated"})
+	// Port rule: if port is not specified in apply, it should be treated as "not exposed" (port=0).
+	// Domain requires an exposed port.
+	if req.Domain != "" && req.Port == 0 {
+		c.JSON(http.StatusBadRequest, api.Response{Success: false, Message: "domain requires a non-zero port"})
+		return
+	}
+	if req.Args == nil {
+		req.Args = []string{}
+	}
+	if req.Env == nil {
+		req.Env = map[string]string{}
+	}
+
+	app, err := statemanager.GetApp(name)
+	if err != nil || app == nil {
+		app = &api.AppInfo{Name: name}
+	}
+
+	// Overwrite declarative fields from apply.
+	app.Name = name
+	app.Port = req.Port
+	app.Args = req.Args
+	app.Domain = req.Domain
+	app.WorkingDir = req.WorkingDir
+	app.Env = req.Env
+
+	if err := statemanager.SaveApp(*app); err != nil {
+		c.JSON(http.StatusInternalServerError, api.Response{Success: false, Message: err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, api.Response{Success: true, Message: "App updated", Data: app})
 }
 
 func (s *Server) handleDeleteIngress(c *gin.Context) {
@@ -147,48 +205,85 @@ func (s *Server) handleListIngress(c *gin.Context) {
 	c.JSON(http.StatusOK, api.Response{Success: true, Data: configs})
 }
 
-func (s *Server) handleConfig(c *gin.Context) {
+func (s *Server) handleGetConfig(c *gin.Context) {
 	appName := c.Param("appName")
-	if len(appName) > 1 {
-		appName = appName[1:]
-	} else {
-		c.JSON(http.StatusBadRequest, api.Response{Success: false, Message: "App name required"})
+	config, err := configmanager.Get(appName)
+	if err != nil {
+		c.JSON(http.StatusNotFound, api.Response{Success: false, Message: err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, api.Response{Success: true, Data: config})
+}
+
+func (s *Server) handleUpdateConfig(c *gin.Context) {
+	appName := c.Param("appName")
+	var newConfig map[string]any
+	if err := c.ShouldBindJSON(&newConfig); err != nil {
+		c.JSON(http.StatusBadRequest, api.Response{Success: false, Message: "Invalid JSON"})
 		return
 	}
 
-	if c.Request.Method == http.MethodGet {
-		config, err := configmanager.Get(appName)
-		if err != nil {
-			c.JSON(http.StatusNotFound, api.Response{Success: false, Message: err.Error()})
-			return
-		}
-		c.JSON(http.StatusOK, api.Response{Success: true, Data: config})
+	merge := c.Query("merge") != "false"
+	if err := configmanager.Set(appName, newConfig, merge); err != nil {
+		c.JSON(http.StatusInternalServerError, api.Response{Success: false, Message: "Failed to update config"})
 		return
 	}
 
-	if c.Request.Method == http.MethodPut {
-		var newConfig map[string]any
-		if err := c.ShouldBindJSON(&newConfig); err != nil {
-			c.JSON(http.StatusBadRequest, api.Response{Success: false, Message: "Invalid JSON"})
-			return
-		}
+	c.JSON(http.StatusOK, api.Response{Success: true, Message: "Config updated"})
+}
 
-		merge := c.Query("merge") != "false"
-		if err := configmanager.Set(appName, newConfig, merge); err != nil {
-			c.JSON(http.StatusInternalServerError, api.Response{Success: false, Message: "Failed to update config"})
-			return
-		}
+func (s *Server) handleRenderConfig(c *gin.Context) {
+	appName := c.Param("appName")
 
-		// Notify AppCenter (Hot Reload)
-		if err := appcenter.SendConfigUpdate(appName, newConfig); err != nil {
-			log.Printf("Warning: failed to push config update to app %s: %v\n", appName, err)
-		}
-
-		c.JSON(http.StatusOK, api.Response{Success: true, Message: "Config updated"})
+	// Get the config from server storage
+	config, err := configmanager.Get(appName)
+	if err != nil {
+		c.JSON(http.StatusNotFound, api.Response{Success: false, Message: err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusMethodNotAllowed, api.Response{Success: false, Message: "Method not allowed"})
+	// Get dataDir from system config
+	dataDir, _ := configmanager.GetSystemConfig("data_dir")
+	if dataDir == "" {
+		dataDir = "."
+	}
+	if absDir, err := filepath.Abs(dataDir); err == nil {
+		dataDir = absDir
+	}
+
+	// Ensure app directory exists
+	appDir := filepath.Join(dataDir, "apps", appName)
+	if err := os.MkdirAll(appDir, 0755); err != nil {
+		c.JSON(http.StatusInternalServerError, api.Response{Success: false, Message: fmt.Sprintf("Failed to create app directory: %v", err)})
+		return
+	}
+
+	// Write config to disk
+	configFileName := appName + "_local_config.json"
+	configFilePath := filepath.Join(appDir, configFileName)
+	configBytes, err := json.Marshal(config)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, api.Response{Success: false, Message: fmt.Sprintf("Failed to marshal config: %v", err)})
+		return
+	}
+
+	if err := os.WriteFile(configFilePath, configBytes, 0644); err != nil {
+		c.JSON(http.StatusInternalServerError, api.Response{Success: false, Message: fmt.Sprintf("Failed to write config file: %v", err)})
+		return
+	}
+
+	// Calculate simple hash for verification
+	configHash := fmt.Sprintf("%x", md5.Sum(configBytes))
+
+	c.JSON(http.StatusOK, api.Response{
+		Success: true,
+		Message: "Config rendered successfully",
+		Data: map[string]any{
+			"path":        configFilePath,
+			"bytes":       len(configBytes),
+			"configHash":  configHash,
+		},
+	})
 }
 
 func (s *Server) handleUploadApp(c *gin.Context) {
@@ -341,6 +436,32 @@ func (s *Server) handleRestartApp(c *gin.Context) {
 
 func (s *Server) handleListApps(c *gin.Context) {
 	apps := manager.ListApps()
+
+	// Dynamically query process info for each app
+	for i := range apps {
+		if apps[i].Pid != 0 {
+			if p, err := process.NewProcess(int32(apps[i].Pid)); err == nil {
+				// Process exists - update status and metrics
+				apps[i].Status = "RUNNING"
+				if cpuPercent, err := p.CPUPercent(); err == nil {
+					apps[i].Stats.CPUPercent = cpuPercent
+				}
+				if memInfo, err := p.MemoryInfo(); err == nil {
+					apps[i].Stats.MemoryUsage = uint64(memInfo.RSS)
+				}
+				if createTime, err := p.CreateTime(); err == nil {
+					apps[i].StartTime = createTime / 1000
+				}
+			} else {
+				// Process doesn't exist
+				if apps[i].Status != "STOPPED" {
+					apps[i].Status = "EXITED"
+					apps[i].Pid = 0
+				}
+			}
+		}
+	}
+
 	c.JSON(http.StatusOK, api.Response{Success: true, Data: apps})
 }
 
@@ -381,4 +502,99 @@ func (s *Server) handleNodeStatus(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, api.Response{Success: true, Data: node})
+}
+
+func (s *Server) handleGetApp(c *gin.Context) {
+	appName := c.Param("name")
+
+	apps := manager.ListApps()
+	var targetApp *api.AppInfo
+	for i := range apps {
+		if apps[i].Name == appName {
+			targetApp = &apps[i]
+			break
+		}
+	}
+
+	if targetApp == nil {
+		c.JSON(http.StatusNotFound, api.Response{Success: false, Message: "App not found"})
+		return
+	}
+
+	// Dynamically query process info if PID exists
+	if targetApp.Pid != 0 {
+		if p, err := process.NewProcess(int32(targetApp.Pid)); err == nil {
+			// Update CPU, Memory, IO info
+			targetApp.Status = "RUNNING"
+			if cpuPercent, err := p.CPUPercent(); err == nil {
+				targetApp.Stats.CPUPercent = cpuPercent
+			}
+			if memInfo, err := p.MemoryInfo(); err == nil {
+				targetApp.Stats.MemoryUsage = uint64(memInfo.RSS)
+			}
+			if createTime, err := p.CreateTime(); err == nil {
+				targetApp.StartTime = createTime / 1000
+			}
+		} else {
+			// Process doesn't exist, update status
+			if targetApp.Status != "STOPPED" {
+				targetApp.Status = "EXITED"
+				targetApp.Pid = 0
+			}
+		}
+	}
+
+	c.JSON(http.StatusOK, api.Response{Success: true, Data: targetApp})
+}
+
+func (s *Server) handleBindMySQL(c *gin.Context) {
+	appName := c.Param("appName")
+
+	var req provisioner.ProvisionMySQLRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, api.Response{Success: false, Message: "Invalid request body"})
+		return
+	}
+
+	result := provisioner.ProvisionMySQL(appName, req)
+	if !result.Success {
+		statusCode := http.StatusInternalServerError
+		if result.Data != nil {
+			if dataMap, ok := result.Data.(map[string]any); ok {
+				if errorCode, ok := dataMap["error_code"].(string); ok && errorCode == "needs_credentials" {
+					statusCode = http.StatusForbidden
+				}
+			}
+		}
+		c.JSON(statusCode, result)
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+
+func (s *Server) handleBindRedis(c *gin.Context) {
+	appName := c.Param("appName")
+
+	var req provisioner.ProvisionRedisRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, api.Response{Success: false, Message: "Invalid request body"})
+		return
+	}
+
+	result := provisioner.ProvisionRedis(appName, req)
+	if !result.Success {
+		statusCode := http.StatusInternalServerError
+		if result.Data != nil {
+			if dataMap, ok := result.Data.(map[string]any); ok {
+				if errorCode, ok := dataMap["error_code"].(string); ok && errorCode == "needs_credentials" {
+					statusCode = http.StatusForbidden
+				}
+			}
+		}
+		c.JSON(statusCode, result)
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
 }

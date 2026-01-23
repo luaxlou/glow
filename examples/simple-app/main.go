@@ -13,16 +13,21 @@ import (
 )
 
 func main() {
-	// 1. Initialize & Register App Identity
+	// 1. 初始化应用身份
 	glowapp.Init("simple-app")
 
+	// 2. 初始化 HTTP 服务
 	glowhttp.Init(33203)
+
+	// 3. 声明需要使用的 MySQL 数据库
+	// 注意：不再调用 ProvisionResource()，资源由 glow apply 配置
 	glowmysql.Init("simple_app_db")
 
 	fmt.Printf("App %s starting\n", glowapp.Name())
 
-	// 2. Implicit wiring: usage triggers configuration & connection
-	// The MySQL component calls config, which calls app (identity) to resolve configuration.
+	// 4. 使用 MySQL（从本地配置文件读取 DSN）
+	// 配置文件由 'glow apply -f app.yaml' 生成
+	// 位置: /var/lib/glow-server/apps/simple-app/simple-app_local_config.json
 	db, err := glowmysql.Gorm()
 	if err != nil {
 		log.Printf("Warning: MySQL not available: %v. Running without DB.", err)
@@ -36,9 +41,10 @@ func main() {
 		}
 	}
 
+	// 5. 设置 HTTP 路由
 	r := glowhttp.Router()
 	r.GET("/", func(c *gin.Context) {
-		c.String(200, "Hello from Implicit-wiring app with Gin!")
+		c.String(200, "Hello from Glow app with Gin!")
 	})
 
 	r.GET("/ws", func(c *gin.Context) {
@@ -55,7 +61,7 @@ func main() {
 		})
 	})
 
+	// 6. 启动服务
 	glowhttp.Run()
 	glowapp.WaitForShutdown()
-
 }

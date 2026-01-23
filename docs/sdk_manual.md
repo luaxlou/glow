@@ -1,6 +1,6 @@
 # Glow SDK 用户手册
 
-`glow/starter` 是 Glow 框架的 Go 语言 SDK，提供了开箱即用的应用骨架和组件。通过使用 SDK，开发者可以轻松地将应用接入 Glow 的全生命周期管理，享受配置热更新和进程托管等特性。
+`glow/starter` 是 Glow 框架的 Go 语言 SDK，提供了开箱即用的应用骨架和组件。通过使用 SDK，开发者可以轻松地将应用接入 Glow 的配置管理和资源绑定。
 
 ## 1. 安装
 
@@ -49,9 +49,9 @@ Glow SDK 提供了一系列标准化的 Starter 组件。
 
 ### 3.1 GlowApp (应用核心)
 
-`glowapp` 是应用的入口，负责身份注册和生命周期管理。
+`glowapp` 是应用的入口，负责生命周期管理。
 
-*   **Init(appName string, opts ...Option)**: 初始化应用身份，并向本地 Glow Server 注册。
+*   **Init(appName string, opts ...Option)**: 初始化应用身份。
 *   **WaitForShutdown()**: 阻塞主 goroutine，直到接收到系统信号 (SIGINT/SIGTERM)。收到信号后，它会通知所有已注册的组件执行清理操作 (Graceful Shutdown)。
 *   **RegisterCleanup(name string, fn func())**: 注册自定义的清理函数，在停机时执行。
 
@@ -65,18 +65,28 @@ Glow SDK 提供了一系列标准化的 Starter 组件。
 
 ### 3.3 GlowConfig (配置管理)
 
-`starter/glowapp/config` 提供了统一的配置接口，支持本地文件 (`local_config.json`) 和配置中心 (Glow Server) 双源加载。
+`starter/glowapp/config` 提供了统一的配置接口，从本地配置文件读取配置。
 
-*   **Get(key string, target interface{})**: 获取配置项。
-*   **动态更新**: 当在 Server 端修改配置时，SDK 会通过 TCP 长连接收到推送，并自动更新内存中的配置。
+*   **Get(key string, target interface{})**: 获取配置项（从 `<appName>_local_config.json` 读取）。
+*   **IsSet(key string) bool**: 检查配置项是否存在。
+
+配置文件由 `glow apply` 命令生成，包含应用元数据和资源绑定信息（如 MySQL DSN、Redis 地址等）。
 
 ### 3.4 GlowMySQL (数据库 - 基于 GORM)
 
-`glowmysql` 提供了与 Glow Server 打通的 MySQL 访问能力，底层基于 [GORM](https://gorm.io)。
+`glowmysql` 提供了 MySQL 数据库访问能力，底层基于 [GORM](https://gorm.io)。
 
-*   **Init(dbName string)**: 声明应用希望使用的数据库名。首次访问会触发 Glow Server 的资源申请/创建逻辑。
-*   **Gorm() (*gorm.DB, error)**: 返回单例的 `*gorm.DB`，用于日常业务开发。
+*   **Init(dbName string)**: 声明应用希望使用的数据库名（用于配置查找）。
+*   **Gorm() (*gorm.DB, error)**: 返回单例的 `*gorm.DB`，从本地配置读取 `mysql.dsn`。
 *   **DB() (*sql.DB, error)**: 在需要原生 `*sql.DB` 的场景下使用，内部复用同一连接。
+
+**重要**: 使用前需先通过 `glow apply -f app.yaml` 绑定 MySQL 资源，在 YAML 中声明：
+```yaml
+spec:
+  resources:
+    mysql:
+      - dbName: myapp_db
+```
 
 示例：
 
@@ -93,9 +103,9 @@ func main() {
     glowapp.Init("my-gorm-app")
 
     glowhttp.Init(8080)
-    glowmysql.Init("my_gorm_app_db")
+    glowmysql.Init("my_gorm_app_db")  // 声明数据库名
 
-    db, err := glowmysql.Gorm()
+    db, err := glowmysql.Gorm()  // 从配置读取 mysql.dsn
     if err != nil {
         log.Fatalf("init mysql via gorm failed: %v", err)
     }
@@ -113,11 +123,49 @@ func main() {
 }
 ```
 
+### 3.5 GlowRedis (缓存)
+
+`glowredis` 提供了 Redis 缓存访问能力，底层基于 [go-redis/v9](https://github.com/redis/go-redis)。
+
+*   **Client() (*redis.Client, error)**: 返回单例的 `*redis.Client`，从本地配置读取 Redis 连接信息。
+
+**重要**: 使用前需先通过 `glow apply -f app.yaml` 绑定 Redis 资源，在 YAML 中声明：
+```yaml
+spec:
+  resources:
+    redis:
+      - db: 0
+```
+
+### 3.6 GlowConfig (配置文件)
+
+配置文件路径：`<data-dir>/apps/<appName>/<appName>_local_config.json`
+
+示例配置结构：
+```json
+{
+  "mysql": {
+    "dsn": "user:pass@tcp(localhost:3306)/dbname"
+  },
+  "redis": {
+    "addr": "localhost:6379",
+    "password": "",
+    "db": 0
+  }
+}
+```
+
 ## 4. 运行机制
 
-### 4.1 本地调试 vs 托管运行
+### 4.1 托管运行
 
-*   **托管运行 (推荐)**: 使用 `glow-server` 启动应用。Server 会自动注入环境变量和配置。
-*   **本地调试**: 直接 `go run main.go`。
-    *   如果本地运行了 `glow-server`，SDK 会尝试连接它进行注册和资源申请。
-    *   如果连接失败，SDK 会降级读取当前目录下的 `local_config.json`。
+应用由 `glow-server` 启动（`glow start app <name>`）：
+* Server 设置环境变量（`OP_APP_NAME`, `OP_APP_PORT`, `OP_APP_DOMAIN`）
+* Server 生成配置文件（`<appName>_local_config.json`）
+* 应用启动时只读取本地配置，**不连接** Server
+
+### 4.2 本地调试
+
+直接 `go run main.go`：
+* SDK 读取当前目录下的 `<appName>_local_config.json`
+* 如需绑定资源，先运行 `glow apply -f app.yaml` 生成配置文件

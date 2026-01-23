@@ -50,20 +50,14 @@ func Gorm() (*gorm.DB, error) {
 
 	log.Printf("Lazy initializing MySQL Starter for %s (db: %s)...", appName, dbName)
 
-	cfg, err := config.ProvisionResource("mysql", dbName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to provision mysql: %w", err)
-	}
-
+	// Read DSN from local config (set by `glow apply`)
 	var dsn string
-	if mysqlCfg, ok := cfg["mysql"].(map[string]any); ok {
-		if d, ok := mysqlCfg["dsn"].(string); ok {
-			dsn = d
-		}
+	if err := config.Get("mysql.dsn", &dsn); err != nil {
+		return nil, fmt.Errorf("mysql.dsn not found in config. Please run 'glow apply -f app.yaml' first (with spec.resources.mysql declared)")
 	}
 
 	if dsn == "" {
-		return nil, fmt.Errorf("dsn not found in mysql config")
+		return nil, fmt.Errorf("mysql.dsn is empty in config")
 	}
 
 	conn, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})

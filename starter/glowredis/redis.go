@@ -38,21 +38,12 @@ func Client() (*redis.Client, error) {
 		return nil, fmt.Errorf("app identity not set. call sdk.Init() first")
 	}
 
-	// Convention: Use appName + "_cache" or similar for Redis?
-	// For now, let's assume we request a generic "redis" resource or "cache"
-	// But let's stick to the resource type "redis" and name = appName + "_redis"
-	resourceName := appName + "_redis"
+	// NOTE: With local-config-only mode (post `glow apply`), we don't request resources at runtime.
+	// Keep legacy naming convention documented here for compatibility, but avoid unused vars.
 
 	log.Printf("Lazy initializing Redis Starter for %s...", appName)
 
-	// Provision/Get Config
-	cfg, err := config.ProvisionResource("redis", resourceName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to provision redis: %w", err)
-	}
-
-	// Extract Redis Config
-	// Expecting structure: {"redis": {"addr": "...", "username": "...", "password": "...", "db": 0}}
+	// Read Redis config from local config (set by `glow apply`)
 	var rCfg struct {
 		Addr     string `json:"addr"`
 		Username string `json:"username"`
@@ -60,28 +51,12 @@ func Client() (*redis.Client, error) {
 		DB       int    `json:"db"`
 	}
 
-	// Manual map decoding (viper/json generic map hell)
-	if redisMap, ok := cfg["redis"].(map[string]any); ok {
-		if v, ok := redisMap["addr"].(string); ok {
-			rCfg.Addr = v
-		}
-		if v, ok := redisMap["username"].(string); ok {
-			rCfg.Username = v
-		}
-		if v, ok := redisMap["password"].(string); ok {
-			rCfg.Password = v
-		}
-		if v, ok := redisMap["db"].(float64); ok {
-			rCfg.DB = int(v)
-		} else if v, ok := redisMap["db"].(int); ok {
-			rCfg.DB = v
-		}
+	if err := config.Get("redis", &rCfg); err != nil {
+		return nil, fmt.Errorf("redis config not found in config. Please run 'glow apply -f app.yaml' first (with spec.resources.redis declared)")
 	}
 
 	if rCfg.Addr == "" {
-		// Fallback: maybe the config is flattened?
-		// For now, fail if not found
-		return nil, fmt.Errorf("redis address not found in config")
+		return nil, fmt.Errorf("redis.addr not found in config")
 	}
 
 	c := redis.NewClient(&redis.Options{

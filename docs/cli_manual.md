@@ -1,106 +1,653 @@
 # Glow CLI 用户手册
 
-`glow` 是与 Glow Server 交互的命令行工具，采用类似 Kubernetes (kubectl) 的声明式与命令式相结合的设计风格，旨在提供高效、直观的本地开发环境管理体验。
+`glow` 是与 Glow Server 交互的命令行工具，采用声明式配置设计，通过 `glow apply` 命令统一管理应用配置和资源绑定。
 
 ## 1. 安装与配置
 
 ### 安装
-只提供一键脚本安装（不依赖 Go 工具链，不提供手动编译/拷贝安装方式）。
 
 ```bash
-# 本地安装（安装 glow + glow-server；不常驻、不注册服务）
+# 本地安装（安装 glow + glow-server）
 curl -fsSL "https://raw.githubusercontent.com/luaxlou/glow/main/scripts/install-local.sh" | bash
 ```
 
 ### 初始化配置
-如果你是通过“安装 glow-server + glow”的一键脚本安装，脚本会自动执行 `glow-server keygen` 并写入 `glow` 的默认 context；
-此时你可以直接执行 `glow get ...`。
 
-需要连接到其他 Glow Server 时，再手动添加/切换 context：
+安装脚本会自动执行 `glow-server keygen` 并配置默认 context。此时你可以直接使用 `glow get ...` 等命令。
+
+如需连接到其他 Glow Server：
 
 ```bash
-# 添加一个远端环境
-glow context add prod --url http://<YOUR_SERVER>:32102 --key <YOUR_API_KEY>
+# 添加远端环境
+glow context add prod --server-url http://<YOUR_SERVER>:32102 --api-key <YOUR_API_KEY>
 
 # 切换上下文
 glow context use prod
 ```
 
-配置信息默认存储在 `~/.glow.json`。
+配置信息存储在 `~/.glow.json`。
 
 ## 2. 核心命令概览
 
-Glow CLI 的命令结构主要由“动词 + 资源”构成。
+### 应用配置 (glow apply) - **重要**
 
-### 应用部署 (Deployment)
+`glow apply` 是**唯一的资源配置方式**。所有资源（应用、端口、域名、MySQL、Redis）都在 YAML 文件中声明。
 
-用于快速部署或更新本地应用二进制文件。
+*   **`glow apply -f <app.yaml>`**: 应用配置文件。
+    *   注册/更新应用元数据
+    *   绑定资源（MySQL、Redis）
+    *   配置 Ingress（域名绑定）
+    *   生成应用配置文件
 
-*   **`glow deploy <binary_path>`**: 部署应用。
-    *   `glow deploy ./myapp`: 将本地二进制文件部署到服务器。如果服务器已有同名应用且二进制内容未变（Hash 校验），则跳过上传。
-    *   `glow deploy ./myapp --name my-custom-app`: 指定应用名称。
+**详细文档**: 参见 [Glow Apply 手册](glow_apply_manual.md)
 
-### 资源查看与描述 (Read-only)
+### 应用生命周期管理 (Lifecycle)
 
-用于查看系统状态和资源详情。
+控制应用进程的启动、停止和删除。
 
-*   **`glow get <resource>`**: 列出资源列表。
-    *   `glow get apps` (或 `app`): 列出所有应用及其状态（CPU、内存、端口等）。
-    *   `glow get ingress`: 列出所有网关路由规则。
-    *   `glow get nodes` (或 `node`): 查看集群节点及其系统负载。
-    *   `glow get resources`: 查看受管的基础设施资源（如 MySQL, Redis）。
+*   **`glow start app <name>`**: 启动应用。
+*   **`glow stop <name>`**: 停止应用。
+*   **`glow restart app <name>`**: 重启应用。
+*   **`glow delete app <name>`**: 删除应用及其配置。
 
-*   **`glow describe <resource> <name>`**: 查看特定资源的详细元数据。
-    *   `glow describe app my-app`: 显示应用的完整配置、环境变量及实时统计。
-    *   `glow describe node localhost`: 显示节点系统详情。
+### 资源查看 (Read-only)
+
+查看系统状态和资源详情。
+
+*   **`glow get <resource>`**: 列出资源。
+    *   `glow get apps` (或 `app`): 列出所有应用及其状态。
+    *   `glow get ingress`: 列出所有域名绑定规则。
+    *   `glow get node`: 查看节点状态。
+
+*   **`glow describe <resource> <name>`**: 查看详细信息。
+    *   `glow describe app my-app`: 显示应用完整配置。
 
 *   **`glow logs <name>`**: 查看应用日志。
-    *   `glow logs my-app`: 打印应用的标准输出日志。
-
-### 资源生命周期管理 (Lifecycle)
-
-直接控制应用进程的运行状态。
-
-*   **`glow start app <name>`**: 启动已停止的应用。
-*   **`glow stop app <name>`**: 优雅停止运行中的应用。
-*   **`glow restart app <name>`**: 重启应用进程。
-*   **`glow delete <resource> <name>`**: 删除资源。
-    *   `glow delete app my-app`: 停止并移除应用。
-    *   `glow delete ingress my-app`: 删除对应的路由规则。
+    *   `glow logs my-app`: 打印应用标准输出日志。
 
 ### 配置管理 (Configuration)
 
-*   **`glow config`**: 应用配置中心管理。
-    *   `glow config view <app>`: 查看应用的当前 JSON 配置。
-    *   `glow config edit <app>`: 调用系统编辑器（如 vim）交互式修改配置，保存后即热更新。
+查看和管理应用配置。
 
-### 环境与认证管理 (System)
+*   **`glow get config <app>`**: 查看应用的配置（JSON 格式）。
 
-*   **`glow context`**: 多环境管理。
-    *   `glow context list`: 列出所有环境。
-    *   `glow context use <name>`: 切换当前环境。
-*   **`glow auth`**: 认证管理。
-    *   `glow auth view`: 查看当前连接信息。
-    *   `glow auth reset`: 重置本地认证信息。
+**注意**: 配置更新通过 `glow apply -f app.yaml` 完成，不再支持在线编辑。
 
-## 3. 常用场景示例
+### 环境管理 (Context)
 
-### 场景一：调试应用配置
-1. 查看当前配置：
-   ```bash
-   glow config view my-service
-   ```
-2. 在线修改配置（例如开启调试模式）：
-   ```bash
-   glow config edit my-service
-   ```
-3. 重启应用以确保某些静态配置生效（如果需要）：
-   ```bash
-   glow restart app my-service
-   ```
+多环境管理。
 
-### 场景二：查看应用日志
+*   **`glow context list`**: 列出所有环境。
+*   **`glow context use <name>`**: 切换当前环境。
+*   **`glow context add <name> --server-url <url> --api-key <key>`**: 添加新环境。
+
+## 3. 工作流说明
+
+### 新架构工作流
+
+**重要**: Glow 现在使用声明式配置模型。应用不再在运行时连接服务器申请资源。
+
+#### 配置阶段
+
 ```bash
-# 实时查看日志
-glow logs my-service
+# 1. 编写应用配置文件
+cat > app.yaml <<EOF
+apiVersion: v1
+kind: App
+metadata:
+  name: my-app
+spec:
+  binary: ./my-app
+  port: 8080
+  domain: myapp.example.com
+  resources:
+    mysql:
+      - dbName: myapp_db
+EOF
+
+# 2. 应用配置（一次性完成所有资源绑定）
+glow apply -f app.yaml
 ```
+
+**执行结果**:
+- ✅ 应用元数据已注册
+- ✅ MySQL 数据库已创建
+- ✅ Ingress（域名）已配置
+- ✅ 配置文件已生成
+
+#### 运行阶段
+
+```bash
+# 3. 启动应用
+glow start app my-app
+
+# 4. 查看状态
+glow get app my-app
+
+# 5. 查看日志
+glow logs my-app
+```
+
+### 架构对比
+
+**旧工作流（已废弃）**:
+```bash
+./my-app  # ❌ 应用启动时连接服务器申请资源
+```
+
+**新工作流（当前）**:
+```bash
+glow apply -f app.yaml     # ✅ 预先配置资源
+glow start app my-app      # ✅ 启动应用
+```
+
+## 4. 常用场景示例
+
+### 场景一：部署新的 Web 应用
+
+```bash
+# 1. 编写配置文件
+cat > my-app.yaml <<EOF
+apiVersion: v1
+kind: App
+metadata:
+  name: my-web-app
+spec:
+  binary: ./my-web-app
+  port: 8080
+  domain: myapp.example.com
+  resources:
+    mysql:
+      - dbName: myapp_db
+    redis:
+      - db: 0
+EOF
+
+# 2. 应用配置
+glow apply -f my-app.yaml
+
+# 3. 启动应用
+glow start app my-web-app
+
+# 4. 验证
+curl http://myapp.example.com/
+```
+
+### 场景二：更新应用配置
+
+```bash
+# 1. 修改配置文件
+vim my-app.yaml
+
+# 2. 重新应用配置
+glow apply -f my-app.yaml
+
+# 3. 重启应用使新配置生效
+glow restart app my-app
+```
+
+### 场景三：查看应用状态和日志
+
+```bash
+# 查看所有应用
+glow get apps
+
+# 查看应用详情
+glow describe app my-app
+
+# 查看实时日志
+glow logs my-app
+
+# 查看生成的配置文件
+cat /var/lib/glow-server/apps/my-app/my-app_local_config.json
+```
+
+### 场景四：多环境管理
+
+```bash
+# 添加生产环境
+glow context add prod --server-url http://prod-server:32102 --api-key <prod-key>
+
+# 添加开发环境
+glow context add dev --server-url http://localhost:32102 --api-key <dev-key>
+
+# 切换到生产环境
+glow context use prod
+
+# 在生产环境部署
+glow apply -f app-prod.yaml
+glow start app my-app
+
+# 切换回开发环境
+glow context use dev
+```
+
+### 场景五：后台 Worker（无端口）
+
+```bash
+# Worker 不需要对外开放端口
+cat > worker.yaml <<EOF
+apiVersion: v1
+kind: App
+metadata:
+  name: my-worker
+spec:
+  binary: ./my-worker
+  # 不指定 port
+  resources:
+    mysql:
+      - dbName: worker_db
+EOF
+
+# 应用并启动
+glow apply -f worker.yaml
+glow start app my-worker
+```
+
+### 场景六：微服务（共享数据库）
+
+```yaml
+# api-service.yaml
+apiVersion: v1
+kind: App
+metadata:
+  name: api-service
+spec:
+  binary: ./api-service
+  port: 8080
+  resources:
+    mysql:
+      - dbName: shared_db
+    redis:
+      - db: 0
+```
+
+```yaml
+# worker.yaml
+apiVersion: v1
+kind: App
+metadata:
+  name: worker
+spec:
+  binary: ./worker
+  resources:
+    mysql:
+      - dbName: shared_db  # 共享同一数据库
+    redis:
+      - db: 1              # 不同的 Redis DB
+```
+
+```bash
+# 部署两个服务
+glow apply -f api-service.yaml
+glow apply -f worker.yaml
+
+# 启动服务
+glow start app api-service
+glow start app worker
+```
+
+## 5. 命令参考
+
+### glow apply
+
+**语法**: `glow apply -f <filename>`
+
+**参数**:
+- `-f, --file string`: YAML 配置文件路径（必需）
+
+**示例**:
+```bash
+glow apply -f app.yaml
+glow apply -f /path/to/config.yaml
+```
+
+**输出**:
+```
+Applying App 'my-app' from app.yaml...
+✓ App 'my-app' registered successfully
+→ Configuring Ingress for domain: myapp.example.com
+✓ Ingress configured: http://myapp.example.com -> port 8080
+→ Binding MySQL resources...
+✓ MySQL 'myapp_db' bound successfully (DSN: ****)
+→ Generating config file...
+✓ Config file written to: /var/lib/glow-server/apps/my-app/my-app_local_config.json
+
+Summary:
+  App Name: my-app
+  Port: 8080
+  Domain: myapp.example.com
+  MySQL: 1 database(s)
+
+Next steps:
+  1. Review the config file generated
+  2. Start the app: glow start app my-app
+  3. Check status: glow get app my-app
+```
+
+### glow get
+
+**语法**: `glow get <resource>`
+
+**资源类型**:
+- `apps` (或 `app`, `applications`): 列出所有应用
+- `ingress`: 列出所有域名绑定
+- `node`: 查看节点状态
+
+**示例**:
+```bash
+glow get apps           # 列出应用
+glow get app            # 同上
+glow get ingress        # 列出 Ingress
+glow get node           # 查看节点
+```
+
+### glow describe
+
+**语法**: `glow describe <resource> <name>`
+
+**示例**:
+```bash
+glow describe app my-app     # 查看应用详情
+```
+
+**输出**:
+```
+Name:       my-app
+Status:     RUNNING
+PID:        12345
+Port:       8080
+Domain:     myapp.example.com
+Restarts:   0
+Command:    /var/lib/glow-server/apps/my-app/glow_my-app
+Args:       []
+WorkDir:    /var/lib/glow-server/apps/my-app
+Age:        5m30s
+
+Resources:
+  CPU:      0.1%
+  Memory:   8.5 MB
+
+Config:
+  {
+    "mysql": {
+      "dsn": "glow_myapp:***@tcp(localhost:3306)/glow_myapp_db"
+    }
+  }
+```
+
+### glow start
+
+**语法**: `glow start app <name>`
+
+**示例**:
+```bash
+glow start app my-app
+```
+
+**输出**: `app.apps/my-app started`
+
+### glow stop
+
+**语法**: `glow stop <name>`
+
+**示例**:
+```bash
+glow stop my-app
+```
+
+**输出**: `app.apps/my-app stopped`
+
+### glow restart
+
+**语法**: `glow restart app <name>`
+
+**示例**:
+```bash
+glow restart app my-app
+```
+
+**输出**: `app.apps/my-app restarted`
+
+### glow delete
+
+**语法**: `glow delete app <name>`
+
+**行为**:
+- 停止应用（如果正在运行）
+- 删除应用配置
+- 删除应用文件（二进制、日志等）
+- 删除 Ingress 配置
+
+**示例**:
+```bash
+glow delete app my-app
+```
+
+**输出**: `app.apps/my-app deleted`
+
+### glow logs
+
+**语法**: `glow logs <name>`
+
+**示例**:
+```bash
+glow logs my-app
+```
+
+**输出**: 显示应用的标准输出和标准错误。
+
+### glow context
+
+**子命令**:
+- `glow context list`: 列出所有环境
+- `glow context use <name>`: 切换环境
+- `glow context add <name> --server-url <url> --api-key <key>`: 添加环境
+
+**示例**:
+```bash
+# 列出环境
+glow context list
+
+# 切换环境
+glow context use prod
+
+# 添加新环境
+glow context add staging --server-url http://staging:32102 --api-key xyz
+```
+
+## 6. 配置文件格式
+
+### 应用配置 (app.yaml)
+
+```yaml
+apiVersion: v1
+kind: App
+metadata:
+  name: app-name
+spec:
+  binary: ./app                # 必需：应用二进制路径
+  workingDir: /path/to/dir     # 可选：工作目录
+  port: 8080                    # 可选：HTTP 端口
+  domain: app.local            # 可选：域名（需要 port）
+  args: ["--v"]                # 可选：启动参数
+  env:                          # 可选：环境变量
+    - name: ENV
+      value: production
+  resources:                    # 可选：资源声明
+    mysql:
+      - dbName: myapp_db       # MySQL 数据库
+    redis:
+      - db: 0                   # Redis 实例
+```
+
+**详细说明**: 参见 [Glow Apply 手册](glow_apply_manual.md)
+
+## 7. 故障排查
+
+### 问题 1: apply 返回 404
+
+**症状**: `glow apply -f app.yaml` 返回 `server returned status 404`
+
+**原因**: glow-server 版本过旧，缺少新的 API 路由
+
+**解决**:
+```bash
+# 重新编译并重启 glow-server
+cd /path/to/glow
+go build -o glow-server ./cmd/glow-server
+sudo pkill -f glow-server
+sudo ./glow-server serve
+```
+
+### 问题 2: MySQL 绑定失败
+
+**症状**: `MySQL binding failed: needs_credentials`
+
+**解决**: 在 app.yaml 中添加密码：
+```yaml
+resources:
+  mysql:
+    - dbName: existing_db
+      existingPassword: "your-password"
+```
+
+### 问题 3: 应用启动失败
+
+**排查步骤**:
+```bash
+# 1. 查看详细日志
+glow logs my-app
+
+# 2. 检查配置文件
+cat /var/lib/glow-server/apps/my-app/my-app_local_config.json
+
+# 3. 检查进程状态
+glow get app my-app
+```
+
+### 问题 4: 域名无法访问
+
+**排查步骤**:
+```bash
+# 1. 检查 /etc/hosts
+cat /etc/hosts | grep app.local
+
+# 2. 添加 hosts 条目（如果缺失）
+echo "127.0.0.1 app.local" | sudo tee -a /etc/hosts
+
+# 3. 检查 Nginx 配置
+cat /etc/nginx/sites-available/my-app
+
+# 4. 测试 Nginx 配置
+sudo nginx -t
+```
+
+## 8. 高级用法
+
+### 环境变量注入
+
+```yaml
+spec:
+  env:
+    - name: DATABASE_URL
+      value: "mysql://user:pass@localhost/db"
+    - name: API_KEY
+      value: "sk-xxxxxx"
+```
+
+### 多数据库
+
+```yaml
+resources:
+  mysql:
+    - dbName: main_db
+    - dbName: cache_db
+    - dbName: log_db
+```
+
+应用中访问：
+```go
+glowmysql.Init("main_db")   // 使用 main_db
+glowmysql.Init("cache_db")  // 使用 cache_db
+```
+
+### 条件配置（使用注释）
+
+```yaml
+spec:
+  port: 8080
+  # domain: myapp.local    # 取消注释以启用
+  resources:
+    mysql:
+      - dbName: myapp_db
+  # redis:                  # 取消注释以启用
+  #   - db: 0
+```
+
+## 9. 最佳实践
+
+### 1. 版本控制
+
+将所有 `app.yaml` 纳入 Git：
+
+```bash
+git add app.yaml
+git commit -m "Add app configuration"
+git push
+```
+
+### 2. 环境分离
+
+为不同环境创建不同的配置文件：
+
+```
+app.yaml              # 开发环境
+app-staging.yaml      # 测试环境
+app-production.yaml   # 生产环境
+```
+
+### 3. 配置验证
+
+应用前验证 YAML 语法：
+
+```bash
+# 使用 yamllint
+yamllint app.yaml
+
+# 或使用 Python
+python3 -c "import yaml; yaml.safe_load(open('app.yaml'))"
+```
+
+### 4. 渐进式更新
+
+先更新配置，再重启应用：
+
+```bash
+# Step 1: 更新配置（不影响运行中的应用）
+glow apply -f app.yaml
+
+# Step 2: 检查生成的配置
+cat /var/lib/glow-server/apps/my-app/my-app_local_config.json
+
+# Step 3: 重启应用
+glow restart app my-app
+```
+
+## 10. 相关资源
+
+- **Glow Apply 手册**: [docs/glow_apply_manual.md](glow_apply_manual.md)
+- **快速开始**: [QUICKSTART.md](../QUICKSTART.md)
+- **SDK 文档**: [docs/sdk_manual.md](sdk_manual.md)
+- **示例应用**: [examples/README.md](../examples/README.md)
+
+## 总结
+
+Glow CLI 提供了声明式的应用管理方式：
+
+✅ **统一配置**: `glow apply` 是唯一资源配置方式
+✅ **简单易用**: YAML 文件定义所有资源
+✅ **幂等操作**: 可以重复执行 apply
+✅ **完整工具链**: 从配置到部署的完整支持
+
+记住：**所有资源配置都在 YAML 文件中完成**。

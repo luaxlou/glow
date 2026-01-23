@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/luaxlou/glow/internal/apiserver"
-	"github.com/luaxlou/glow/internal/appcenter"
 	"github.com/luaxlou/glow/internal/configmanager"
 	"github.com/luaxlou/glow/internal/manager"
 	"github.com/luaxlou/glow/internal/statemanager"
@@ -21,7 +20,6 @@ import (
 
 var (
 	serverPort    int
-	appCenterPort int
 	dataDir       string
 	maxAgeDays    int
 	maxTotalMB    int
@@ -30,7 +28,6 @@ var (
 func init() {
 	rootCmd.AddCommand(serveCmd)
 	serveCmd.Flags().IntVarP(&serverPort, "port", "p", 32102, "HTTP Port")
-	serveCmd.Flags().IntVarP(&appCenterPort, "app-center-port", "a", 32101, "App Center Port")
 	serveCmd.Flags().StringVar(&dataDir, "data-dir", "", "Data directory path (default: /var/lib/glow-server)")
 	serveCmd.Flags().IntVar(&maxAgeDays, "log-max-age-days", 30, "Maximum age of log files in days")
 	serveCmd.Flags().IntVar(&maxTotalMB, "log-max-total-mb", 500, "Maximum total size of log files in MB")
@@ -63,7 +60,6 @@ var serveCmd = &cobra.Command{
 			Port:      serverPort,
 			StartTime: time.Now().UnixMilli(),
 		}
-		appcenter.RegisterActiveApp(serverAppInfo, nil)
 
 		fmt.Printf("Registering glow-server in DB (PID: %d)...\n", os.Getpid())
 		if err := statemanager.SaveApp(serverAppInfo); err != nil {
@@ -76,11 +72,6 @@ var serveCmd = &cobra.Command{
 		apiKey, err := configmanager.GetSystemConfig("api_key")
 		if err != nil || apiKey == "" {
 			log.Fatal("API Key not found. Please run 'glow-server keygen' first.")
-		}
-
-		log.Printf("Starting App Center on port %d...", appCenterPort)
-		if err := appcenter.Start(appCenterPort); err != nil {
-			log.Fatalf("Failed to start App Center: %v", err)
 		}
 
 		glowapp.Init("glow-server", glowapp.WithNoRegistration())
