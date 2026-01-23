@@ -2,6 +2,95 @@
 
 This directory contains utility scripts for Glow development and release management.
 
+## Quick Start
+
+### Creating a Complete Release
+
+```bash
+# 1. Build binaries for all platforms
+./scripts/build.sh
+
+# 2. Create the release
+./scripts/release.sh --version v1.0.0 --title "Version 1.0.0"
+
+# 3. Upload binaries to release
+./scripts/upload-assets.sh v1.0.0
+```
+
+Or manually:
+
+```bash
+# Build and upload in one command
+./scripts/build.sh && gh release upload v1.0.0 ./dist/* --clobber
+```
+
+## Build Script
+
+**`build.sh`** - Compile glow-server and glow CLI for multiple platforms
+
+### Platforms Supported
+
+- darwin/amd64 (macOS Intel)
+- darwin/arm64 (macOS Apple Silicon)
+- linux/amd64 (Linux Intel)
+- linux/arm64 (Linux ARM)
+
+### Usage
+
+```bash
+./scripts/build.sh
+```
+
+### Output
+
+Binaries are created in `./dist/` directory:
+- `glow-server-{os}-{arch}` - Server binaries
+- `glow-{os}-{arch}` - CLI binaries
+- `SHA256SUMS.txt` - Checksums for verification
+
+### Example
+
+```bash
+$ ./scripts/build.sh
+
+[INFO] Glow Build Script
+[INFO] Version: v1.0.0-beta.6
+[INFO] Building for darwin/arm64...
+[INFO] ✓ Built: glow-server-darwin-arm64
+[INFO] ✓ Built: glow-darwin-arm64
+...
+[INFO] Build completed!
+```
+
+## Upload Assets Script
+
+**`upload-assets.sh`** - Upload compiled binaries to GitHub release
+
+### Usage
+
+```bash
+./scripts/upload-assets.sh <version> [dist-directory]
+```
+
+### Examples
+
+```bash
+# Upload binaries for v1.0.0
+./scripts/upload-assets.sh v1.0.0
+
+# Upload from custom directory
+./scripts/upload-assets.sh v1.0.0 ./dist
+
+# Or use gh CLI directly
+gh release upload v1.0.0 ./dist/* --clobber
+```
+
+### What It Does
+
+- Finds all binaries in the dist directory
+- Uploads them to the specified GitHub release
+- Includes SHA256SUMS.txt for verification
+
 ## Release Script
 
 **`release.sh`** - Automated release script for creating GitHub releases
