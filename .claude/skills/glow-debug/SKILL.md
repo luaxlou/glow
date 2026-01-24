@@ -37,18 +37,29 @@ App Center: localhost:32101
 ### 方式一：直接运行（推荐）
 
 ```bash
-# 在项目目录
-cd my-glow-app
+# 1. 在项目目录创建 app.yaml
+cat > app.yaml <<EOF
+apiVersion: v1
+kind: App
+metadata:
+  name: my-app
+spec:
+  config:
+    mysql_dsn: "user:pass@tcp(localhost:3306)/myapp_db"
+    redis_addr: "localhost:6379"
+EOF
 
-# 直接运行应用
+# 2. 生成配置文件
+glow apply -f app.yaml
+
+# 3. 直接运行应用
+cd my-glow-app
 go run main.go
 ```
 
-SDK 会自动：
-1. 连接到 glow-server (127.0.0.1:32101)
-2. 注册应用身份
-3. 获取配置
-4. 申请资源（MySQL、Redis）
+SDK 会：
+1. 从本地配置文件读取配置（`<appName>_local_config.json`）
+2. 使用配置中的数据库连接等信息
 
 ### 方式二：手动分离
 
@@ -63,26 +74,31 @@ go run main.go
 
 ## 本地配置文件
 
-当 glow-server 不可用时，SDK 降级使用本地配置。
+配置文件通过 `glow apply -f app.yaml` 生成，位于：
+- 托管运行：`<data-dir>/apps/<appName>/<appName>_local_config.json`
+- 本地调试：当前目录下的 `<appName>_local_config.json`
 
-创建 `local_config.json`：
+配置文件内容来自 `app.yaml` 的 `spec.config` 字段：
 
+```yaml
+# app.yaml
+spec:
+  config:
+    debug: true
+    log_level: "debug"
+    mysql_dsn: "user:pass@tcp(localhost:3306)/my_app_db"
+    redis_addr: "localhost:6379"
+    redis_db: 0
+```
+
+生成的配置文件：
 ```json
 {
   "debug": true,
   "log_level": "debug",
-  "database": {
-    "host": "localhost",
-    "port": 3306,
-    "user": "root",
-    "password": "",
-    "name": "my_app_db"
-  },
-  "redis": {
-    "host": "localhost",
-    "port": 6379,
-    "db": 0
-  }
+  "mysql_dsn": "user:pass@tcp(localhost:3306)/my_app_db",
+  "redis_addr": "localhost:6379",
+  "redis_db": 0
 }
 ```
 
@@ -197,14 +213,19 @@ func main() {
 import "github.com/luaxlou/glow/starter/glowapp/config"
 
 type Config struct {
-    Debug bool `json:"debug"`
+    Debug     bool   `json:"debug"`
+    MySQLDSN  string `json:"mysql_dsn"`
+    RedisAddr string `json:"redis_addr"`
 }
 
 var cfg Config
 if err := config.Get("app", &cfg); err != nil {
     log.Printf("Failed to load config: %v", err)
+    log.Printf("Config file location: <appName>_local_config.json")
 } else {
     log.Printf("Loaded config: %+v\n", cfg)
+    log.Printf("MySQL DSN: %s\n", cfg.MySQLDSN)
+    log.Printf("Redis Addr: %s\n", cfg.RedisAddr)
 }
 ```
 
@@ -348,25 +369,34 @@ export OP_APP_PORT=""
 
 **检查：**
 ```bash
-# 查看 glow-server 中的配置
-glow config view my-app
+# 1. 确认配置文件已生成
+ls -la <appName>_local_config.json
 
-# 确认配置格式正确（JSON）
-cat local_config.json | jq
+# 2. 查看配置文件内容
+cat <appName>_local_config.json | jq
+
+# 3. 检查 app.yaml 配置
+cat app.yaml
+
+# 4. 重新生成配置文件
+glow apply -f app.yaml
 ```
 
 ### MySQL 连接失败
 
 **检查：**
 ```bash
-# 查看 glow-server info
-glow-server info
+# 1. 检查 app.yaml 中的配置
+cat app.yaml | grep mysql_dsn
 
-# 检查 MySQL 资源
-glow get resources
+# 2. 检查生成的配置文件
+cat <appName>_local_config.json | grep mysql_dsn
 
-# 测试连接
-mysql -u root -p -e "SHOW DATABASES;"
+# 3. 测试 MySQL 连接
+mysql -u user -p -h localhost -e "SHOW DATABASES;"
+
+# 4. 确认 MySQL 服务运行正常
+sudo systemctl status mysql
 ```
 
 ## 生产模拟
@@ -374,19 +404,35 @@ mysql -u root -p -e "SHOW DATABASES;"
 ### 本地测试部署流程
 
 ```bash
-# 1. 编译
+# 1. 创建 app.yaml
+cat > app.yaml <<EOF
+apiVersion: v1
+kind: App
+metadata:
+  name: my-app
+spec:
+  binary: ./my-app
+  port: 8080
+  config:
+    mysql_dsn: "user:pass@tcp(localhost:3306)/myapp_db"
+EOF
+
+# 2. 编译
 go build -o my-app
 
-# 2. 部署到本地 glow-server
-glow deploy ./my-app
+# 3. 应用配置
+glow apply -f app.yaml
 
-# 3. 查看状态
+# 4. 启动应用
+glow start app my-app
+
+# 5. 查看状态
 glow get apps
 
-# 4. 测试 API
+# 6. 测试 API
 curl http://localhost:8080/health
 
-# 5. 查看日志
+# 7. 查看日志
 glow logs my-app
 ```
 
@@ -394,7 +440,8 @@ glow logs my-app
 
 ```bash
 # 启动应用
-glow deploy ./my-app
+glow apply -f app.yaml
+glow start app my-app
 
 # 压力测试
 wrk -t4 -c100 -d30s http://localhost:8080/api
@@ -438,20 +485,22 @@ glow-server serve
 
 ## 最佳实践
 
-1. **使用 glow-server**: 本地开发时保持 glow-server 运行
+1. **配置文件管理**: 使用 `glow apply -f app.yaml` 生成配置文件
 2. **热重载**: 使用 air 或 gow 提高开发效率
-3. **环境隔离**: 开发使用本地配置，生产使用 glow-server
+3. **环境隔离**: 为不同环境创建不同的 YAML 文件
 4. **调试端点**: 添加 `/debug` 端点查看应用状态
 5. **日志输出**: 使用 `log.Printf()` 输出调试信息
 6. **测试驱动**: 编写测试确保代码质量
+7. **配置即代码**: 所有配置在 YAML 文件中管理，纳入版本控制
 
 ## 调试清单
 
 开发前检查：
-- [ ] glow-server 是否运行
-- [ ] 端口是否可用（8080 或由 glow-server 分配）
-- [ ] MySQL/Redis 资源是否配置
-- [ ] local_config.json 是否准备（降级用）
+- [ ] app.yaml 配置文件是否创建
+- [ ] 是否已执行 `glow apply -f app.yaml` 生成配置文件
+- [ ] 端口是否可用（8080 或由 app.yaml 指定）
+- [ ] MySQL/Redis 服务是否运行
+- [ ] 数据库连接信息是否正确
 
 开发时：
 - [ ] 使用 `glow logs` 查看日志
@@ -459,6 +508,8 @@ glow-server serve
 - [ ] 定期运行测试
 
 部署前：
+- [ ] app.yaml 配置完整且正确
+- [ ] 已执行 `glow apply -f app.yaml` 生成配置文件
 - [ ] 编译二进制文件
 - [ ] 测试部署流程
 - [ ] 验证配置正确

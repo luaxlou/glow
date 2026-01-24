@@ -51,27 +51,34 @@
 
 ### 应用启动流程
 
-1. **应用启动**: `go run main.go` 或 `glow deploy ./app`
-2. **SDK 初始化**: `glowapp.Init("app-name")`
-3. **服务注册**: SDK 连接到 Glow Server (TCP 32101)
-4. **配置拉取**: SDK 从配置中心获取应用配置
-5. **资源申请**: 如需 MySQL/Redis，Server 自动创建
-6. **启动 HTTP**: SDK 启动 HTTP 服务，监听分配的端口
-7. **网关配置**: Server 自动配置 Nginx 反向代理
+1. **配置阶段**: `glow apply -f app.yaml`
+   - 注册应用元数据
+   - 配置 Ingress（域名绑定）
+   - 生成应用配置文件（`<appName>_local_config.json`）
+2. **启动阶段**: `glow start app <name>`
+   - Server 设置环境变量（`OP_APP_NAME`, `OP_APP_PORT`）
+   - 启动应用进程
+3. **运行阶段**: 应用启动
+   - SDK 初始化: `glowapp.Init("app-name")`
+   - 配置读取: SDK 从本地配置文件读取配置
+   - 资源连接: 使用配置中的数据库连接等信息
+   - 启动 HTTP: SDK 启动 HTTP 服务，监听分配的端口
+4. **网关配置**: Server 自动配置 Nginx 反向代理（如果指定了 domain）
 
 ### 配置更新流程
 
-1. **修改配置**: `glow config edit app-name`
-2. **推送配置**: Server 通过 TCP 连接推送到应用
-3. **热更新**: SDK 自动更新内存配置
-4. **组件重载**: 相关组件自动使用新配置
+1. **修改配置**: 编辑 `app.yaml` 中的 `spec.config` 字段
+2. **应用配置**: `glow apply -f app.yaml`
+   - 重新生成配置文件（`<appName>_local_config.json`）
+   - 如果应用正在运行且配置变化，自动重启应用
+3. **配置生效**: 应用重启后从新配置文件读取配置
 
 ### 应用监控流程
 
-1. **心跳保活**: SDK 定期发送心跳到 Server
-2. **进程监控**: Server 监控应用进程状态
-3. **自动重启**: 应用崩溃时，Server 自动重启
-4. **日志轮转**: Server 自动管理应用日志
+1. **进程监控**: Server 监控应用进程状态
+2. **自动重启**: 应用崩溃时，Server 自动重启
+3. **日志轮转**: Server 自动管理应用日志
+4. **状态查询**: 通过 `glow get apps` 和 `glow describe app <name>` 查看应用状态
 
 ## 部署模式
 
@@ -107,29 +114,40 @@ Load Balancer
 
 ## 资源管理
 
-### MySQL 自动化
+### MySQL 配置
 
-```bash
-# 应用声明使用数据库
-glowmysql.Init("my_app_db")
-
-# Glow Server 自动：
-# 1. 检查数据库是否存在
-# 2. 如果不存在，创建数据库
-# 3. 创建用户和授权
-# 4. 返回连接信息给应用
+```yaml
+# app.yaml
+spec:
+  config:
+    mysql_dsn: "user:pass@tcp(localhost:3306)/my_app_db"
 ```
 
-### Redis 自动化
+```bash
+# 应用配置
+glow apply -f app.yaml
+
+# 生成的配置文件包含 mysql_dsn
+# 应用从配置文件读取连接信息
+```
+
+### Redis 配置
+
+```yaml
+# app.yaml
+spec:
+  config:
+    redis_addr: "localhost:6379"
+    redis_password: ""
+    redis_db: 0
+```
 
 ```bash
-# 应用声明使用 Redis
-glowredis.Init()
+# 应用配置
+glow apply -f app.yaml
 
-# Glow Server 自动：
-# 1. 检查 Redis 是否运行
-# 2. 分配独立的数据库编号（0-15）
-# 3. 返回连接信息给应用
+# 生成的配置文件包含 Redis 连接信息
+# 应用从配置文件读取连接信息
 ```
 
 ## 安全考虑
@@ -153,11 +171,11 @@ glow-server keygen
 - **App Center** (32101): 仅本地访问
 - **应用端口**: 自动分配，通过 Nginx 暴露
 
-### 最小权限
+### 配置隔离
 
-- 应用仅能访问自己申请的数据库
-- 不同应用使用不同的 Redis DB
-- 应用间相互隔离
+- 每个应用有独立的配置文件
+- 不同应用使用不同的数据库连接配置
+- 应用间通过配置隔离
 
 ## 扩展性
 
@@ -191,8 +209,12 @@ glow-server keygen
 ### 配置备份
 
 ```bash
-# 备份配置数据库
-cp /var/lib/glow-server/db/glow.db /backup/glow.db.$(date +%Y%m%d)
+# 备份配置文件（推荐）
+git add app.yaml
+git commit -m "Backup app configuration"
+
+# 备份生成的配置文件
+cp /var/lib/glow-server/apps/<app-name>/<app-name>_local_config.json /backup/
 ```
 
 ### 日志持久化
@@ -260,9 +282,10 @@ glow-server info
 
 ## 最佳实践
 
-1. **资源隔离**: 每个应用使用独立的数据库
-2. **配置外部化**: 通过 glow config 管理配置
-3. **优雅停机**: 使用 `glow stop` 而非 `kill -9`
-4. **日志管理**: 定期检查和清理日志
-5. **监控告警**: 设置应用重启次数告警
-6. **备份策略**: 定期备份配置数据库
+1. **配置即代码**: 所有配置在 `app.yaml` 中管理，纳入版本控制
+2. **资源隔离**: 每个应用使用独立的数据库连接配置
+3. **声明式配置**: 使用 `glow apply -f app.yaml` 统一管理配置
+4. **优雅停机**: 使用 `glow stop` 而非 `kill -9`
+5. **日志管理**: 定期检查和清理日志
+6. **监控告警**: 设置应用重启次数告警
+7. **备份策略**: 配置文件纳入 Git 版本控制

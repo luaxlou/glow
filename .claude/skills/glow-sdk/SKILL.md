@@ -69,7 +69,7 @@ glowapp.WaitForShutdown()
 
 ### GlowConfig - 配置管理
 
-统一配置接口，支持本地文件和配置中心双源加载。
+统一配置接口，从本地配置文件读取配置。
 
 ```go
 import "github.com/luaxlou/glow/starter/glowapp/config"
@@ -78,10 +78,8 @@ import "github.com/luaxlou/glow/starter/glowapp/config"
 type AppConfig struct {
     Debug     bool   `json:"debug"`
     LogPath   string `json:"log_path"`
-    Database  struct {
-        Host string `json:"host"`
-        Port int    `json:"port"`
-    } `json:"database"`
+    MySQLDSN  string `json:"mysql_dsn"`
+    RedisAddr string `json:"redis_addr"`
 }
 
 // 加载配置
@@ -92,23 +90,27 @@ if err := config.Get("app", &cfg); err != nil {
 
 // 使用配置
 fmt.Printf("Debug mode: %v\n", cfg.Debug)
+fmt.Printf("MySQL DSN: %s\n", cfg.MySQLDSN)
 ```
 
-**配置优先级：**
-1. Glow Server 配置中心（动态热更新）
-2. 本地 `local_config.json`
+**配置文件位置：**
+- 托管运行：`<data-dir>/apps/<appName>/<appName>_local_config.json`
+- 本地调试：当前目录下的 `<appName>_local_config.json`
+
+**配置生成：**
+配置文件通过 `glow apply -f app.yaml` 命令生成，所有配置在 YAML 文件的 `spec.config` 字段中声明。
 
 ### GlowMySQL - 数据库（GORM）
 
-基于 GORM 的 MySQL 访问，自动资源申请。
+基于 GORM 的 MySQL 访问，从本地配置读取连接信息。
 
 ```go
 import "github.com/luaxlou/glow/starter/glowmysql"
 
-// 初始化（声明数据库名）
+// 初始化（声明数据库名，用于配置查找）
 glowmysql.Init("my_app_db")
 
-// 获取 GORM 实例
+// 获取 GORM 实例（从配置读取 mysql.dsn）
 db, err := glowmysql.Gorm()
 if err != nil {
     log.Fatalf("Failed to init MySQL: %v", err)
@@ -132,16 +134,20 @@ var users []User
 db.Find(&users)
 ```
 
+**重要**: 使用前需先通过 `glow apply -f app.yaml` 配置 MySQL 连接，在 YAML 中声明：
+```yaml
+spec:
+  config:
+    mysql_dsn: "user:pass@tcp(localhost:3306)/myapp_db"
+```
+
 ### GlowRedis - Redis 客户端
 
 ```go
 import "github.com/luaxlou/glow/starter/glowredis"
 
-// 初始化（使用默认数据库 0）
+// 初始化（从配置读取 Redis 连接信息）
 glowredis.Init()
-
-// 或者指定数据库
-glowredis.InitDB(1)
 
 // 获取客户端
 client, err := glowredis.Client()
@@ -158,6 +164,15 @@ if err != nil {
 
 val, err := client.Get(ctx, "key").Result()
 fmt.Println("key", val)
+```
+
+**重要**: 使用前需先通过 `glow apply -f app.yaml` 配置 Redis 连接，在 YAML 中声明：
+```yaml
+spec:
+  config:
+    redis_addr: "localhost:6379"
+    redis_password: ""
+    redis_db: 0
 ```
 
 ### GlowWebSocket - WebSocket 支持
@@ -326,16 +341,33 @@ if err != nil {
 
 ### 3. 配置管理
 
+配置通过 `glow apply -f app.yaml` 生成，在 YAML 的 `spec.config` 中声明：
+
+```yaml
+spec:
+  config:
+    debug: true
+    mysql_dsn: "user:pass@tcp(localhost:3306)/myapp_db"
+    redis_addr: "localhost:6379"
+    log_level: "info"
+```
+
+应用读取配置：
 ```go
+import "github.com/luaxlou/glow/starter/glowapp/config"
+
 type Config struct {
-    Debug bool   `json:"debug"`
-    DBName string `json:"db_name"`
+    Debug     bool   `json:"debug"`
+    MySQLDSN  string `json:"mysql_dsn"`
+    RedisAddr string `json:"redis_addr"`
+    LogLevel  string `json:"log_level"`
 }
 
 var cfg Config
 if err := config.Get("app", &cfg); err != nil {
+    log.Printf("Failed to load config: %v", err)
     // 使用默认值
-    cfg = Config{Debug: false, DBName: "default_db"}
+    cfg = Config{Debug: false, LogLevel: "info"}
 }
 
 // 使用配置
@@ -372,10 +404,10 @@ glowapp.WaitForShutdown()
 ## 常见问题
 
 ### Q: 如何在本地调试？
-A: 确保 glow-server 运行，然后 `go run main.go`。SDK 会自动连接。
+A: 先运行 `glow apply -f app.yaml` 生成配置文件，然后 `go run main.go`。SDK 会从本地配置文件读取配置。
 
-### Q: 配置如何热更新？
-A: 通过 `glow config edit` 修改配置，SDK 会自动收到推送并更新。
+### Q: 配置如何更新？
+A: 修改 `app.yaml` 中的 `spec.config`，然后运行 `glow apply -f app.yaml` 重新生成配置文件。如果应用正在运行，需要重启应用使新配置生效。
 
 ### Q: 数据库连接失败怎么办？
-A: 检查 glow-server 的 MySQL 资源配置，使用 `glow-server info` 查看。
+A: 检查 `app.yaml` 中 `spec.config.mysql_dsn` 配置是否正确，确认 MySQL 服务运行正常，数据库已创建。

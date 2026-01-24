@@ -62,36 +62,42 @@ Failed to load config: config not found for app: my-app
 ```
 
 **原因：**
-- glow-server 中没有配置
+- 配置文件未生成
 - 应用名称不匹配
+- 配置文件路径不正确
 
 **解决方案：**
 
 1. 检查应用名称
 ```bash
 # 确保 glowapp.Init() 中的名称一致
-glowapp.Init("my-app")  # 必须与部署名称一致
+glowapp.Init("my-app")  # 必须与 app.yaml 中的名称一致
 ```
 
-2. 添加配置
+2. 生成配置文件
 ```bash
-# 方法1: 通过 glow CLI
-glow config edit my-app
-
-# 方法2: 直接在 glow-server 数据库
-# 不推荐，仅用于调试
-```
-
-3. 使用本地配置
-```bash
-# 创建 local_config.json
-cat > local_config.json << 'EOF'
-{
-  "app": {
-    "debug": true
-  }
-}
+# 创建 app.yaml
+cat > app.yaml <<EOF
+apiVersion: v1
+kind: App
+metadata:
+  name: my-app
+spec:
+  config:
+    debug: true
 EOF
+
+# 应用配置生成文件
+glow apply -f app.yaml
+```
+
+3. 检查配置文件位置
+```bash
+# 托管运行
+ls -la /var/lib/glow-server/apps/my-app/my-app_local_config.json
+
+# 本地调试
+ls -la my-app_local_config.json
 ```
 
 ### 数据库错误
@@ -110,34 +116,30 @@ MySQL not available: dial tcp 127.0.0.1:3306: connect: connection refused
 
 **解决方案：**
 
-1. 检查 glow-server MySQL 配置
+1. 检查 app.yaml 中的配置
 ```bash
-glow-server info
-
-# 输出应包含：
-# MySQL:
-#   Host: 127.0.0.1
-#   Port: 3306
+cat app.yaml | grep mysql_dsn
 ```
 
-2. 检查 MySQL 资源
+2. 检查生成的配置文件
 ```bash
-glow get resources
+cat <appName>_local_config.json | grep mysql_dsn
 ```
 
 3. 测试 MySQL 连接
 ```bash
-mysql -u root -p -e "SHOW DATABASES;"
+# 使用配置文件中的连接信息
+mysql -u user -p -h localhost -e "SHOW DATABASES;"
 ```
 
-4. 添加 MySQL 资源
+4. 确认 MySQL 服务运行正常
 ```bash
-glow-server add mysql
+sudo systemctl status mysql
 ```
 
-5. 检查数据库是否创建
+5. 检查数据库是否存在
 ```bash
-mysql -u root -p -e "USE my_app_db; SHOW TABLES;"
+mysql -u user -p -h localhost -e "USE my_app_db; SHOW TABLES;"
 ```
 
 #### Redis connection failed
@@ -149,17 +151,22 @@ Redis not available: dial tcp 127.0.0.1:6379: connect: connection refused
 
 **解决方案：**
 
-1. 检查 Redis 状态
+1. 检查 app.yaml 中的配置
+```bash
+cat app.yaml | grep redis
+```
+
+2. 检查生成的配置文件
+```bash
+cat <appName>_local_config.json | grep redis
+```
+
+3. 检查 Redis 状态
 ```bash
 redis-cli ping
 ```
 
-2. 添加 Redis 资源
-```bash
-glow-server add redis
-```
-
-3. 测试连接
+4. 测试连接
 ```bash
 redis-cli
 > PING
@@ -575,10 +582,10 @@ A: 检查端口是否被占用，查看错误日志
 A: 确保 glow-server 运行中，检查防火墙设置
 
 **Q: 配置修改后不生效？**
-A: 某些配置需要重启应用，使用 `glow restart app my-app`
+A: 修改 `app.yaml` 后执行 `glow apply -f app.yaml` 重新生成配置文件，然后使用 `glow restart app my-app` 重启应用
 
 **Q: 数据库连接失败？**
-A: 检查 `glow-server info` 中的 MySQL 配置，确认数据库已创建
+A: 检查 `app.yaml` 中 `spec.config.mysql_dsn` 配置是否正确，确认 MySQL 服务运行正常，数据库已创建
 
 **Q: 端口冲突？**
 A: 让 glow-server 自动分配端口，或不设置 OP_APP_PORT

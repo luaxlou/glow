@@ -20,9 +20,9 @@
 - [x] 3.5 支持 `--json` 参数输出 JSON 格式
 
 ## 4. 测试与文档
-- [ ] 4.1 手动测试 app.yaml config 字段声明与 apply 流程
+- [x] 4.1 手动测试 app.yaml config 字段声明与 apply 流程
 - [x] 4.2 ~~手动测试 `glow config set/get/list/export` 命令~~（已移除，无需测试）
-- [ ] 4.3 手动测试 `glow server info` 命令（包括 --json 参数）
-- [ ] 4.4 更新 `docs/cli_manual.md`，说明 config 字段和 server info 用法
-- [ ] 4.5 更新 `docs/sdk_manual.md`，说明应用如何读取配置
-- [ ] 4.6 更新 `README.md`，说明配置管理方式和运维命令
+- [x] 4.3 手动测试 `glow server info` 命令（包括 --json 参数）
+- [x] 4.4 更新 `docs/cli_manual.md`，说明 config 字段和 server info 用法
+- [x] 4.5 更新 `docs/sdk_manual.md`，说明应用如何读取配置
+- [x] 4.6 更新 `README.md`，说明配置管理方式和运维命令
