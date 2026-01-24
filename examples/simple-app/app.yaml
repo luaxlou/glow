@@ -46,8 +46,8 @@ spec:
     max_connections: 100
 
   # HTTP 服务端口
-  # 应用会通过 OP_APP_PORT 环境变量收到端口 33302
-  port: 33302
+  # 应用会通过 OP_APP_PORT 环境变量收到端口 33272
+  port: 33272
 
   # Ingress 配置（可选）
   # 指定 domain 后，glow-server 会自动配置 Nginx 反向代理
