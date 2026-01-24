@@ -144,6 +144,14 @@ confirm_proceed() {
         return 0
     fi
 
+    # Check if running in non-interactive mode (piped from curl)
+    # If stdin is not a terminal, skip confirmation and proceed
+    if [ ! -t 0 ]; then
+        echo "   ℹ Non-interactive mode detected, proceeding automatically..."
+        return 0
+    fi
+
+    # Interactive mode: ask for confirmation
     read -p "Continue with initialization? [y/N] " input
     input=$(echo "$input" | tr '[:upper:]' '[:lower:]')
 
