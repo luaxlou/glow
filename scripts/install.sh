@@ -62,13 +62,42 @@ detect_platform() {
     log_info "Detected platform: $OS-$ARCH"
 }
 
-# Get latest release version
+# Get latest release version (including pre-releases)
 get_latest_version() {
     log_info "Fetching latest release version..."
-    VERSION=$(curl -s https://api.github.com/repos/${REPO}/releases/latest | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/' | sed 's/^v//')
+
+    # Method 1: Get all releases (including pre-releases) and find the latest by version number
+    # Get first page of releases (up to 30, should be enough)
+    local releases_json=$(curl -s "https://api.github.com/repos/${REPO}/releases?per_page=30" 2>/dev/null)
+    
+    if [ -n "$releases_json" ]; then
+        # Extract all tag names, remove 'v' prefix, and sort by version number
+        # This ensures we get the truly latest version, including pre-releases
+        local temp_file=$(mktemp)
+        echo "$releases_json" | grep -oE '"tag_name":\s*"v[0-9][^"]*"' | sed -E 's/.*"v([^"]+)".*/\1/' > "$temp_file"
+        
+        if [ -s "$temp_file" ]; then
+            # Sort by version and get the latest
+            VERSION=$(sort -V "$temp_file" | tail -1)
+        fi
+        rm -f "$temp_file"
+    fi
+
+    # Method 2: Fallback to /releases/latest (non-prerelease only)
+    if [ -z "$VERSION" ]; then
+        log_warn "Failed to get all releases, trying /releases/latest (non-prerelease only)..."
+        VERSION=$(curl -s https://api.github.com/repos/${REPO}/releases/latest 2>/dev/null | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/' | sed 's/^v//')
+    fi
+
+    # Method 3: Fallback to VERSION file from main branch
+    if [ -z "$VERSION" ]; then
+        log_warn "GitHub API unavailable, trying VERSION file from main branch..."
+        VERSION=$(curl -s https://raw.githubusercontent.com/${REPO}/main/VERSION 2>/dev/null | tr -d '[:space:]' || echo "")
+    fi
 
     if [ -z "$VERSION" ]; then
         log_error "Failed to fetch latest version"
+        log_error "Please specify version manually or check your internet connection"
         exit 1
     fi
 
