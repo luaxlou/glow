@@ -297,7 +297,7 @@ func (s *Server) handleRenderConfig(c *gin.Context) {
 	}
 
 	// Write config to disk
-	configFileName := appName + "_local_config.json"
+	configFileName := "config.json"
 	configFilePath := filepath.Join(appDir, configFileName)
 	configBytes, err := json.Marshal(config)
 	if err != nil {

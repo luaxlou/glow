@@ -6,7 +6,7 @@ import (
 	"log"
 	"sync"
 
-	"github.com/luaxlou/glow/starter/glowapp/config"
+	"github.com/luaxlou/glow/pkg/glowconfig"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -41,37 +41,27 @@ func Client() (*redis.Client, error) {
 		return client, nil
 	}
 
-	appName := config.AppIdentity
-	if appName == "" {
-		return nil, fmt.Errorf("app identity not set. call sdk.Init() first")
-	}
-
 	// NOTE: With local-config-only mode (post `glow apply`), we don't request resources at runtime.
 	// Keep legacy naming convention documented here for compatibility, but avoid unused vars.
 
-	log.Printf("Lazy initializing Redis Starter for %s...", appName)
+	log.Printf("Lazy initializing Redis Starter...")
 
 	// Read Redis config from local config (set by `glow apply`)
-	var rCfg struct {
-		Addr     string `json:"addr"`
-		Username string `json:"username"`
-		Password string `json:"password"`
-		DB       int    `json:"db"`
+	cfg, err := glowconfig.Load()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load config: %v. Please run 'glow apply -f app.yaml' first", err)
 	}
 
-	if err := config.Get("redis", &rCfg); err != nil {
-		return nil, fmt.Errorf("redis config not found in config. Please run 'glow apply -f app.yaml' first (with spec.resources.redis declared)")
-	}
-
-	if rCfg.Addr == "" {
+	addr := cfg.GetString("redis.addr")
+	if addr == "" {
 		return nil, fmt.Errorf("redis.addr not found in config")
 	}
 
 	c := redis.NewClient(&redis.Options{
-		Addr:     rCfg.Addr,
-		Username: rCfg.Username,
-		Password: rCfg.Password,
-		DB:       rCfg.DB,
+		Addr:     addr,
+		Username: cfg.GetString("redis.username"),
+		Password: cfg.GetString("redis.password"),
+		DB:       cfg.GetInt("redis.db"),
 	})
 
 	if err := c.Ping(context.Background()).Err(); err != nil {

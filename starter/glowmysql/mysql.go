@@ -6,7 +6,7 @@ import (
 	"log"
 	"sync"
 
-	"github.com/luaxlou/glow/starter/glowapp/config"
+	"github.com/luaxlou/glow/pkg/glowconfig"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
@@ -38,23 +38,19 @@ func Gorm() (*gorm.DB, error) {
 		return gdb, nil
 	}
 
-	appName := config.AppIdentity
-	if appName == "" {
-		return nil, fmt.Errorf("app identity not set. call app.Init() first")
-	}
-
 	if dbName == "" {
 		return nil, fmt.Errorf("mysql db name not configured. use mysql.Init(dbName)")
 	}
 
-	log.Printf("Lazy initializing MySQL Starter for %s (db: %s)...", appName, dbName)
+	log.Printf("Lazy initializing MySQL Starter for db: %s...", dbName)
 
 	// Read DSN from local config (set by `glow apply`)
-	var dsn string
-	if err := config.Get("mysql.dsn", &dsn); err != nil {
-		return nil, fmt.Errorf("mysql.dsn not found in config. Please run 'glow apply -f app.yaml' first (with spec.resources.mysql declared)")
+	cfg, err := glowconfig.Load()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load config: %v. Please run 'glow apply -f app.yaml' first", err)
 	}
 
+	dsn := cfg.GetString("mysql.dsn")
 	if dsn == "" {
 		return nil, fmt.Errorf("mysql.dsn is empty in config")
 	}
