@@ -101,12 +101,14 @@ analyze_project() {
     HAS_SCRIPTS_DIR=false
     HAS_DEPLOY_SH=false
     HAS_CLAUDE_DIR=false
+    HAS_APP_YAML=false
 
-    [ -d "cmd" ] && HAS_CMD_DIR=true
-    [ -d "bin" ] && HAS_BIN_DIR=true
-    [ -d "scripts" ] && HAS_SCRIPTS_DIR=true
-    [ -f "scripts/deploy.sh" ] && HAS_DEPLOY_SH=true
-    [ -d ".claude" ] && HAS_CLAUDE_DIR=true
+    [ -d "cmd" ] && HAS_CMD_DIR=true || true
+    [ -d "bin" ] && HAS_BIN_DIR=true || true
+    [ -d "scripts" ] && HAS_SCRIPTS_DIR=true || true
+    [ -f "scripts/deploy.sh" ] && HAS_DEPLOY_SH=true || true
+    [ -d ".claude" ] && HAS_CLAUDE_DIR=true || true
+    [ -f "app.yaml" ] && HAS_APP_YAML=true || true
 }
 
 # Print project analysis
@@ -119,12 +121,13 @@ print_analysis() {
         "bin/ $HAS_BIN_DIR"
         "scripts/ $HAS_SCRIPTS_DIR"
         "scripts/deploy.sh $HAS_DEPLOY_SH"
+        "app.yaml $HAS_APP_YAML"
         ".claude/ $HAS_CLAUDE_DIR"
     )
 
     for item in "${items[@]}"; do
-        local name=$(echo "$item" | cut -d' ' -f1)
-        local exists=$(echo "$item" | cut -d' ' -f2)
+        local name=$(echo "$item" | cut -d' ' -f1) || continue
+        local exists=$(echo "$item" | cut -d' ' -f2) || continue
 
         if [ "$exists" = "true" ]; then
             echo -e "   ${GREEN}✅${NC} $name"
@@ -237,10 +240,24 @@ if [ -z "$APP_NAME" ]; then
                         echo "➤ Deploying $app_to_deploy..."
                         BINARY_PATH="bin/${app_to_deploy}"
 
-                        # Build if needed
+                        # Build if needed (with cross-compilation)
                         if [ ! -f "${BINARY_PATH}" ]; then
+                            CURRENT_OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+                            TARGET_OS="${GOOS:-linux}"
+                            TARGET_ARCH="${GOARCH:-amd64}"
+                            
+                            # Default to linux/amd64 for server deployment
+                            if [ -z "$GOOS" ] && [ -z "$GOARCH" ]; then
+                                TARGET_OS="linux"
+                                TARGET_ARCH="amd64"
+                            fi
+                            
+                            # Always set target platform for consistent builds
+                            export GOOS="$TARGET_OS"
+                            export GOARCH="$TARGET_ARCH"
+                            
                             if go build -o "${BINARY_PATH}" "./cmd/${app_to_deploy}"; then
-                                echo "  ✓ Built: ${BINARY_PATH}"
+                                echo "  ✓ Built: ${BINARY_PATH} (${TARGET_OS}/${TARGET_ARCH})"
                             else
                                 echo "  ❌ Build failed for $app_to_deploy"
                                 continue
@@ -282,16 +299,39 @@ BINARY_PATH="bin/${APP_NAME}"
 
 echo "🚀 Deploying ${APP_NAME} to Glow..."
 
+# Detect current platform
+CURRENT_OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+CURRENT_ARCH=$(uname -m)
+
+# Determine target platform for cross-compilation
+# Glow server typically runs on Linux amd64, so cross-compile if we're on macOS
+# Allow override via environment variables
+TARGET_OS="${GOOS:-linux}"
+TARGET_ARCH="${GOARCH:-amd64}"
+
+# If not explicitly set, default to linux/amd64 for server deployment
+if [ -z "$GOOS" ] && [ -z "$GOARCH" ]; then
+    TARGET_OS="linux"
+    TARGET_ARCH="amd64"
+fi
+
 # Build the application if binary doesn't exist or is outdated
-if [ ! -f "${BINARY_PATH}" ]; then
+if [ ! -f "${BINARY_PATH}" ] || [ "$CURRENT_OS" != "linux" ]; then
     echo "📦 Building ${APP_NAME}..."
 
     # Create bin directory if it doesn't exist
     mkdir -p bin
 
+    # Cross-compile if needed
+    if [ "$CURRENT_OS" != "linux" ] || [ "$CURRENT_ARCH" != "$TARGET_ARCH" ]; then
+        echo "   Cross-compiling for ${TARGET_OS}/${TARGET_ARCH}..."
+    fi
+    export GOOS="$TARGET_OS"
+    export GOARCH="$TARGET_ARCH"
+
     # Build the application
     if go build -o "${BINARY_PATH}" "./cmd/${APP_NAME}"; then
-        echo "✓ Build completed: ${BINARY_PATH}"
+        echo "✓ Build completed: ${BINARY_PATH} (${TARGET_OS}/${TARGET_ARCH})"
     else
         echo "❌ Error: Build failed"
         echo "   Please check your code and try again"
@@ -315,6 +355,100 @@ DEPLOY_EOF
 
     chmod +x scripts/deploy.sh
     echo -e "   ${GREEN}✓${NC} Created scripts/deploy.sh"
+}
+
+# Create app.yaml template
+create_app_yaml() {
+    echo -e "${BLUE}📄 Creating app.yaml template...${NC}"
+
+    if [ "$HAS_APP_YAML" = "true" ] && [ "$FORCE" != "true" ]; then
+        echo "   ⊙ app.yaml already exists, skipping"
+        return 0
+    fi
+
+    # Detect application name
+    APP_NAME=""
+    if [ -d "cmd" ]; then
+        # Find all subdirectories in cmd/
+        apps=($(find cmd -maxdepth 1 -type d ! -name "cmd" -exec basename {} \;))
+        
+        if [ ${#apps[@]} -eq 1 ]; then
+            # Single app, use its name
+            APP_NAME="${apps[0]}"
+        elif [ ${#apps[@]} -gt 1 ]; then
+            # Multiple apps, use first one or project directory name
+            APP_NAME="${apps[0]}"
+            echo "   ⚠ Multiple apps found, using first app: $APP_NAME"
+        fi
+    fi
+
+    # Fallback to project directory name if no app found
+    if [ -z "$APP_NAME" ]; then
+        APP_NAME=$(basename "$(pwd)")
+        echo "   ⚠ No app found in cmd/, using directory name: $APP_NAME"
+    fi
+
+    # Generate a random port in the range 33000-33999
+    RANDOM_PORT=$((33000 + RANDOM % 1000))
+
+    cat > app.yaml << APP_YAML_EOF
+# Glow App 配置文件
+#
+# 使用方法：
+#   1. 构建应用: ./scripts/deploy.sh          # 自动构建并部署
+#   2. 应用配置: glow apply -f app.yaml       # 应用配置并绑定资源
+#   3. 启动应用: glow start app ${APP_NAME}  # 启动应用
+#   4. 查看状态: glow get app ${APP_NAME}     # 查看应用状态
+#
+# 说明：
+# - 应用使用 MySQL 和 HTTP 服务
+# - Ingress（域名绑定）通过 spec.domain 声明
+# - 资源绑定通过 spec.resources 声明
+# - binary 和 workingDir 采用约定大于配置原则（可省略）
+
+apiVersion: v1
+kind: App
+metadata:
+  name: ${APP_NAME}
+spec:
+  # 应用执行配置（约定大于配置）
+  # binary: 默认为 <data-dir>/apps/<app-name>/<app-name>
+  # workingDir: 默认为 <data-dir>/apps/<app-name>
+  # 因此可以省略这两个字段
+
+  args: []
+
+  # 环境变量（可选）
+  env:
+    - name: ENV
+      value: development
+    - name: LOG_LEVEL
+      value: debug
+
+  # 应用配置（可选）⭐
+  # 这些配置会写入到 <data-dir>/apps/<app-name>/<app-name>_local_config.json
+  # 应用代码可以使用 glowconfig 读取这些配置
+  config:
+    # 数据库配置（用户自行提供）
+    mysql_dsn: "root:password@tcp(localhost:3306)/${APP_NAME}_db"
+
+    # Redis 配置（用户自行提供）
+    redis_addr: "localhost:6379"
+
+    # 应用配置
+    log_level: "debug"
+    max_connections: 100
+
+  # HTTP 服务端口
+  # 应用会通过 OP_APP_PORT 环境变量收到端口 ${RANDOM_PORT}
+  port: ${RANDOM_PORT}
+
+  # Ingress 配置（可选）
+  # 指定 domain 后，glow-server 会自动配置 Nginx 反向代理
+  # domain: ${APP_NAME}.local
+APP_YAML_EOF
+
+    echo -e "   ${GREEN}✓${NC} Created app.yaml (app: ${APP_NAME}, port: ${RANDOM_PORT})"
 }
 
 # Setup AI tools
@@ -450,15 +584,22 @@ main() {
     # Create deploy script
     create_deploy_script
 
+    # Create app.yaml template
+    create_app_yaml
+
     # Setup AI tools
     setup_ai_tools
 
     echo ""
     echo -e "${GREEN}✅ Project initialization complete!${NC}"
     echo -e "${BLUE}📝 Next steps:${NC}"
-    echo "   - Review the generated files"
+    echo "   - Review the generated files (app.yaml, scripts/deploy.sh)"
+    echo "   - Edit app.yaml to configure your application"
     echo "   - Run './scripts/deploy.sh' to build and deploy your application"
+    echo "   - Run 'glow apply -f app.yaml' to apply configuration"
 }
 
-# Run main
-main "$@"
+# Run main only if script is executed directly (not sourced)
+if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
+    main "$@"
+fi
