@@ -266,7 +266,7 @@ spec:
 **配置文件生成**:
 执行 `glow apply` 后，配置会写入到：
 ```
-<data-dir>/apps/<app-name>/<app-name>_local_config.json
+<data-dir>/apps/<app-name>/config.json
 ```
 
 **配置来源**:
@@ -277,10 +277,15 @@ spec:
 **应用读取配置**:
 应用使用 SDK 读取本地配置文件：
 ```go
-import "github.com/luaxlou/glow/starter/glowapp/config"
+import "github.com/luaxlou/glow/pkg/glowconfig"
 
 func main() {
     // 读取配置
+    config, err := glowconfig.Load()
+    if err != nil {
+        // 处理错误
+    }
+
     mysqlDSN := config.GetString("mysql_dsn")
     redisAddr := config.GetString("redis_addr")
     logLevel := config.GetString("log_level")
@@ -311,7 +316,7 @@ func main() {
 
 将 `spec.config` 中的所有配置写入本地配置文件。
 
-**配置文件位置**: `<data-dir>/apps/<app-name>/<app-name>_local_config.json`
+**配置文件位置**: `<data-dir>/apps/<app-name>/config.json`
 
 **示例内容**:
 ```json
@@ -345,7 +350,7 @@ Applying App 'my-app' from app.yaml...
 → Configuring Ingress for domain: myapp.example.com
 ✓ Ingress configured: http://myapp.example.com -> port 8080
 → Generating config file...
-✓ Config file written to: /var/lib/glow-server/apps/my-app/my-app_local_config.json (245 bytes)
+✓ Config file written to: /var/lib/glow-server/apps/my-app/config.json (245 bytes)
 
 Summary:
   App Name: my-app
@@ -367,7 +372,7 @@ Applying App 'my-app' from app.yaml...
 → Configuring Ingress for domain: myapp.example.com
 ✓ Ingress configured: http://myapp.example.com -> port 8080
 → Generating config file...
-✓ Config file written to: /var/lib/glow-server/apps/my-app/my-app_local_config.json (256 bytes)
+✓ Config file written to: /var/lib/glow-server/apps/my-app/config.json (256 bytes)
 → Config changed, restarting app 'my-app'...
 ✓ App 'my-app' restarted successfully
 
@@ -532,7 +537,7 @@ python3 -c "import yaml; yaml.safe_load(open('app.yaml'))"
 glow apply -f app.yaml
 
 # 检查生成的配置
-cat /var/lib/glow-server/apps/my-app/my-app_local_config.json
+cat /var/lib/glow-server/apps/my-app/config.json
 ```
 
 ### 5. 配置审查
@@ -677,7 +682,7 @@ glow delete app my-app
 glow logs my-app
 
 # 检查配置文件
-cat /var/lib/glow-server/apps/my-app/my-app_local_config.json
+cat /var/lib/glow-server/apps/my-app/config.json
 
 # 手动测试应用
 cd /var/lib/glow-server/apps/my-app
@@ -700,7 +705,7 @@ sudo systemctl status mysql
 mysql -u user -p -e "SHOW DATABASES;"
 
 # 检查配置文件中的 DSN
-cat /var/lib/glow-server/apps/my-app/my-app_local_config.json | grep mysql_dsn
+cat /var/lib/glow-server/apps/my-app/config.json | grep mysql_dsn
 ```
 
 **解决方案**:
