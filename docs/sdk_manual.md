@@ -24,7 +24,7 @@ import (
 
 func main() {
     // 1. 加载配置
-    config, err := glowconfig.Load()
+    config, err := glowconfig.Get()
     if err != nil {
         fmt.Printf("Failed to load config: %v\n", err)
         return

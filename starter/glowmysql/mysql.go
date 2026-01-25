@@ -45,12 +45,7 @@ func Gorm() (*gorm.DB, error) {
 	log.Printf("Lazy initializing MySQL Starter for db: %s...", dbName)
 
 	// Read DSN from local config (set by `glow apply`)
-	cfg, err := glowconfig.Load()
-	if err != nil {
-		return nil, fmt.Errorf("failed to load config: %v. Please run 'glow apply -f app.yaml' first", err)
-	}
-
-	dsn := cfg.GetString("mysql.dsn")
+	dsn := glowconfig.GetString("mysql.dsn")
 	if dsn == "" {
 		return nil, fmt.Errorf("mysql.dsn is empty in config")
 	}

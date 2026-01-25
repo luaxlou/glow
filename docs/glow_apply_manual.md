@@ -281,7 +281,7 @@ import "github.com/luaxlou/glow/starter/glowconfig"
 
 func main() {
     // 读取配置
-    config, err := glowconfig.Load()
+    config, err := glowconfig.Get()
     if err != nil {
         // 处理错误
     }
