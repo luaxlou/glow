@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/luaxlou/glow/pkg/glowconfig"
+	"github.com/luaxlou/glow/starter/glowconfig"
 )
 
 func main() {

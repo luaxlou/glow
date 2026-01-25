@@ -6,7 +6,7 @@ import (
 	"log"
 	"sync"
 
-	"github.com/luaxlou/glow/pkg/glowconfig"
+	"github.com/luaxlou/glow/starter/glowconfig"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )

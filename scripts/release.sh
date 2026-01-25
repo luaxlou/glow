@@ -434,7 +434,6 @@ main() {
 
         # Supported platforms
         PLATFORMS=(
-            "darwin/amd64"
             "darwin/arm64"
             "linux/amd64"
             "linux/arm64"

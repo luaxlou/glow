@@ -277,7 +277,7 @@ spec:
 **应用读取配置**:
 应用使用 SDK 读取本地配置文件：
 ```go
-import "github.com/luaxlou/glow/pkg/glowconfig"
+import "github.com/luaxlou/glow/starter/glowconfig"
 
 func main() {
     // 读取配置

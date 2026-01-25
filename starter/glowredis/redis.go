@@ -6,7 +6,7 @@ import (
 	"log"
 	"sync"
 
-	"github.com/luaxlou/glow/pkg/glowconfig"
+	"github.com/luaxlou/glow/starter/glowconfig"
 	"github.com/redis/go-redis/v9"
 )
 
