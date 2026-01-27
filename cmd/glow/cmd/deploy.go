@@ -1,13 +1,15 @@
 package cmd
 
 import (
-	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -141,48 +143,99 @@ func calculateLocalFileHash(path string) (string, error) {
 }
 
 func uploadFile(path string) (string, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return "", err
+	uploadURL := strings.TrimSuffix(sanitizeServerURL(serverURL), "/") + "/apps/upload"
+	key := strings.TrimSpace(apiKey)
+	if key == "" {
+		return "", fmt.Errorf("missing api key")
 	}
-	defer file.Close()
 
-	body := &bytes.Buffer{}
-	writer := multipart.NewWriter(body)
-	part, err := writer.CreateFormFile("file", filepath.Base(path))
-	if err != nil {
-		return "", err
-	}
-	_, err = io.Copy(part, file)
-	if err != nil {
-		return "", err
-	}
-	writer.Close()
+	const maxAttempts = 3
+	timeout := 10 * time.Minute
 
-	client := &http.Client{Timeout: 60 * time.Second} // Longer timeout for upload
-	url := strings.TrimSuffix(serverURL, "/") + "/apps/upload"
-	req, err := http.NewRequest("POST", url, body)
+	var lastErr error
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		uploadedPath, err := uploadFileOnce(uploadURL, key, path, timeout)
+		if err == nil {
+			return uploadedPath, nil
+		}
+		lastErr = err
+		if !isRetryableUploadError(err) || attempt == maxAttempts {
+			break
+		}
+		time.Sleep(time.Duration(500*(1<<(attempt-1))) * time.Millisecond)
+	}
+	return "", lastErr
+}
+
+func uploadFileOnce(uploadURL, apiKey, filePath string, timeout time.Duration) (string, error) {
+	pr, pw := io.Pipe()
+	writer := multipart.NewWriter(pw)
+	writeErrCh := make(chan error, 1)
+
+	req, err := http.NewRequest("POST", uploadURL, pr)
 	if err != nil {
+		_ = pw.CloseWithError(err)
 		return "", err
 	}
+
+	go func() {
+		file, err := os.Open(filePath)
+		if err != nil {
+			_ = pw.CloseWithError(err)
+			writeErrCh <- err
+			return
+		}
+		defer file.Close()
+
+		part, err := writer.CreateFormFile("file", filepath.Base(filePath))
+		if err != nil {
+			_ = pw.CloseWithError(err)
+			writeErrCh <- err
+			return
+		}
+		if _, err := io.Copy(part, file); err != nil {
+			_ = pw.CloseWithError(err)
+			writeErrCh <- err
+			return
+		}
+
+		if err := writer.Close(); err != nil {
+			_ = pw.CloseWithError(err)
+			writeErrCh <- err
+			return
+		}
+
+		_ = pw.Close()
+		writeErrCh <- nil
+	}()
+
+	client := &http.Client{Timeout: timeout}
 
 	req.Header.Set("Authorization", "Bearer "+apiKey)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 
 	resp, err := client.Do(req)
 	if err != nil {
+		_ = pw.CloseWithError(err)
+		_ = <-writeErrCh
 		return "", err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		var apiResp api.Response
-		json.NewDecoder(resp.Body).Decode(&apiResp)
+		_ = json.NewDecoder(resp.Body).Decode(&apiResp)
+		<-writeErrCh
 		return "", fmt.Errorf("upload failed: %s (%s)", resp.Status, apiResp.Message)
 	}
 
 	var apiResp api.Response
 	if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
+		<-writeErrCh
+		return "", err
+	}
+
+	if err := <-writeErrCh; err != nil {
 		return "", err
 	}
 
@@ -190,9 +243,31 @@ func uploadFile(path string) (string, error) {
 		return "", fmt.Errorf("upload failed: %s", apiResp.Message)
 	}
 
-	// Data should be the path (string)
 	if pathStr, ok := apiResp.Data.(string); ok {
 		return pathStr, nil
 	}
 	return "", fmt.Errorf("invalid response data from upload")
+}
+
+func sanitizeServerURL(raw string) string {
+	s := strings.TrimSpace(raw)
+	s = strings.Trim(s, "`")
+	return s
+}
+
+func isRetryableUploadError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return true
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "Client.Timeout exceeded") ||
+		strings.Contains(msg, "context deadline exceeded") ||
+		strings.Contains(msg, "timeout")
 }
