@@ -150,6 +150,9 @@ func (s *Server) handleUpsertApp(c *gin.Context) {
 	if req.Env == nil {
 		req.Env = map[string]string{}
 	}
+	if req.Config == nil {
+		req.Config = map[string]any{}
+	}
 
 	app, err := statemanager.GetApp(name)
 	if err != nil || app == nil {
@@ -187,6 +190,10 @@ func (s *Server) handleUpsertApp(c *gin.Context) {
 	app.Config = req.Config
 
 	if err := statemanager.SaveApp(*app); err != nil {
+		c.JSON(http.StatusInternalServerError, api.Response{Success: false, Message: err.Error()})
+		return
+	}
+	if err := configmanager.Set(name, req.Config, false); err != nil {
 		c.JSON(http.StatusInternalServerError, api.Response{Success: false, Message: err.Error()})
 		return
 	}
@@ -275,6 +282,10 @@ func (s *Server) handleUpdateConfig(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, api.Response{Success: false, Message: "Failed to update config"})
 		return
 	}
+	if err := configmanager.Set(appName, app.Config, false); err != nil {
+		c.JSON(http.StatusInternalServerError, api.Response{Success: false, Message: err.Error()})
+		return
+	}
 
 	c.JSON(http.StatusOK, api.Response{Success: true, Message: "Config updated"})
 }
@@ -334,9 +345,9 @@ func (s *Server) handleRenderConfig(c *gin.Context) {
 		Success: true,
 		Message: "Config rendered successfully",
 		Data: map[string]any{
-			"path":        configFilePath,
-			"bytes":       len(configBytes),
-			"configHash":  configHash,
+			"path":       configFilePath,
+			"bytes":      len(configBytes),
+			"configHash": configHash,
 		},
 	})
 }

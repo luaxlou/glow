@@ -108,8 +108,6 @@ func GenerateNginxConfig(dataDir string, cfg NginxConfig) error {
 	info, err := DetectNginx()
 	if err != nil {
 		log.Printf("Nginx detection failed: %v. Only generating local config file.", err)
-	} else {
-		log.Printf("Detected Nginx: %s (Conf: %s)", info.BinaryPath, info.ConfPath)
 	}
 
 	// 2. Generate Config File in local dataDir (as backup/reference)
@@ -136,46 +134,46 @@ func GenerateNginxConfig(dataDir string, cfg NginxConfig) error {
 	f.Close()
 
 	// 3. Link or Copy to Nginx Config Directory (if detected)
-	if info != nil && info.ConfPath != "" {
-		confDir := filepath.Dir(info.ConfPath)
-
-		// Common include directories
-		candidates := []string{
-			filepath.Join(confDir, "servers"),       // macOS Homebrew common
-			filepath.Join(confDir, "conf.d"),        // Linux common
-			filepath.Join(confDir, "sites-enabled"), // Debian/Ubuntu
+	if err != nil || info == nil || info.ConfPath == "" {
+		if err != nil {
+			return fmt.Errorf("nginx not available: %w", err)
 		}
+		return fmt.Errorf("nginx not available: conf path not detected")
+	}
 
-		var targetDir string
-		for _, dir := range candidates {
-			if s, err := os.Stat(dir); err == nil && s.IsDir() {
-				targetDir = dir
-				break
-			}
+	confDir := filepath.Dir(info.ConfPath)
+
+	// Common include directories
+	candidates := []string{
+		filepath.Join(confDir, "servers"),
+		filepath.Join(confDir, "conf.d"),
+		filepath.Join(confDir, "sites-enabled"),
+	}
+
+	var targetDir string
+	for _, dir := range candidates {
+		if s, statErr := os.Stat(dir); statErr == nil && s.IsDir() {
+			targetDir = dir
+			break
 		}
+	}
 
-		if targetDir != "" {
-			targetFile := filepath.Join(targetDir, cfg.Name+".conf")
-			log.Printf("Installing Nginx config to: %s", targetFile)
+	if targetDir == "" {
+		return fmt.Errorf("no suitable nginx include directory found under %s", confDir)
+	}
 
-			// Copy file content
-			input, err := os.ReadFile(fileName)
-			if err != nil {
-				return err
-			}
-			if err := os.WriteFile(targetFile, input, 0644); err != nil {
-				log.Printf("Failed to write to Nginx dir (permission denied?): %v", err)
-			} else {
-				// 4. Reload Nginx
-				if err := ReloadNginx(info.BinaryPath); err != nil {
-					log.Printf("Failed to reload Nginx: %v", err)
-				} else {
-					log.Printf("Nginx reloaded successfully.")
-				}
-			}
-		} else {
-			log.Printf("Warning: No suitable Nginx include directory found in %s", confDir)
-		}
+	targetFile := filepath.Join(targetDir, cfg.Name+".conf")
+	log.Printf("Installing Nginx config to: %s", targetFile)
+
+	input, readErr := os.ReadFile(fileName)
+	if readErr != nil {
+		return readErr
+	}
+	if writeErr := os.WriteFile(targetFile, input, 0644); writeErr != nil {
+		return fmt.Errorf("failed to install nginx config to %s: %w", targetFile, writeErr)
+	}
+	if reloadErr := ReloadNginx(info.BinaryPath); reloadErr != nil {
+		return fmt.Errorf("failed to reload nginx: %w", reloadErr)
 	}
 
 	return nil
