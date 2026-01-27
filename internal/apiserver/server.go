@@ -186,14 +186,6 @@ func (s *Server) handleUpsertApp(c *gin.Context) {
 	app.Env = req.Env
 	app.Config = req.Config
 
-	// Save config to configmanager if provided
-	if req.Config != nil {
-		if err := configmanager.Set(name, req.Config, false); err != nil {
-			c.JSON(http.StatusInternalServerError, api.Response{Success: false, Message: fmt.Sprintf("Failed to save config: %v", err)})
-			return
-		}
-	}
-
 	if err := statemanager.SaveApp(*app); err != nil {
 		c.JSON(http.StatusInternalServerError, api.Response{Success: false, Message: err.Error()})
 		return
@@ -245,12 +237,12 @@ func (s *Server) handleListIngress(c *gin.Context) {
 
 func (s *Server) handleGetConfig(c *gin.Context) {
 	appName := c.Param("appName")
-	config, err := configmanager.Get(appName)
+	app, err := statemanager.GetApp(appName)
 	if err != nil {
 		c.JSON(http.StatusNotFound, api.Response{Success: false, Message: err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, api.Response{Success: true, Data: config})
+	c.JSON(http.StatusOK, api.Response{Success: true, Data: app.Config})
 }
 
 func (s *Server) handleUpdateConfig(c *gin.Context) {
@@ -261,8 +253,25 @@ func (s *Server) handleUpdateConfig(c *gin.Context) {
 		return
 	}
 
+	app, err := statemanager.GetApp(appName)
+	if err != nil {
+		c.JSON(http.StatusNotFound, api.Response{Success: false, Message: "App not found"})
+		return
+	}
+
 	merge := c.Query("merge") != "false"
-	if err := configmanager.Set(appName, newConfig, merge); err != nil {
+	if merge {
+		if app.Config == nil {
+			app.Config = make(map[string]any)
+		}
+		for k, v := range newConfig {
+			app.Config[k] = v
+		}
+	} else {
+		app.Config = newConfig
+	}
+
+	if err := statemanager.SaveApp(*app); err != nil {
 		c.JSON(http.StatusInternalServerError, api.Response{Success: false, Message: "Failed to update config"})
 		return
 	}
@@ -273,11 +282,15 @@ func (s *Server) handleUpdateConfig(c *gin.Context) {
 func (s *Server) handleRenderConfig(c *gin.Context) {
 	appName := c.Param("appName")
 
-	// Get the config from server storage
-	config, err := configmanager.Get(appName)
+	// Get the config from statemanager
+	app, err := statemanager.GetApp(appName)
 	if err != nil {
 		c.JSON(http.StatusNotFound, api.Response{Success: false, Message: err.Error()})
 		return
+	}
+	config := app.Config
+	if config == nil {
+		config = make(map[string]any)
 	}
 
 	// Get dataDir from system config
@@ -313,11 +326,9 @@ func (s *Server) handleRenderConfig(c *gin.Context) {
 	// Calculate simple hash for verification
 	configHash := fmt.Sprintf("%x", md5.Sum(configBytes))
 
-	// Update ConfigHash in AppInfo
-	if app, err := statemanager.GetApp(appName); err == nil {
-		app.ConfigHash = configHash
-		statemanager.SaveApp(*app)
-	}
+	// Update ConfigHash in AppInfo (Save back to statemanager)
+	app.ConfigHash = configHash
+	statemanager.SaveApp(*app)
 
 	c.JSON(http.StatusOK, api.Response{
 		Success: true,
