@@ -436,7 +436,6 @@ main() {
         PLATFORMS=(
             "darwin/arm64"
             "linux/amd64"
-            "linux/arm64"
         )
 
         # Get version from git tag
