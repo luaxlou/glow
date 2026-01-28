@@ -47,7 +47,7 @@ func Client() (*redis.Client, error) {
 	log.Printf("Lazy initializing Redis Starter...")
 
 	// Read Redis config from local config (set by `glow apply`)
-	addr := glowconfig.GetString("redis_addr")
+	addr := glowconfig.GetString("redis.addr")
 	if addr == "" {
 		return nil, fmt.Errorf("redis_addr not found in config")
 	}

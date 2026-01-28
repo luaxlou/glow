@@ -149,11 +149,11 @@ func uploadFile(path string) (string, error) {
 		return "", fmt.Errorf("missing api key")
 	}
 
-	const maxAttempts = 3
-	timeout := 10 * time.Minute
-
-	var lastErr error
-	for attempt := 1; attempt <= maxAttempts; attempt++ {
+	        const maxAttempts = 3
+	        timeout := 60 * time.Minute
+	
+	        var lastErr error
+	        for attempt := 1; attempt <= maxAttempts; attempt++ {
 		uploadedPath, err := uploadFileOnce(uploadURL, key, path, timeout)
 		if err == nil {
 			return uploadedPath, nil
