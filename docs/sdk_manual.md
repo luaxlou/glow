@@ -1,3 +1,7 @@
+## 仓库职责说明
+
+本手册仅覆盖 **glow 框架仓**（starter/SDK）。运维控制面（glow-server/glow-cli）已拆分到 **glow-ops** 仓库。
+
 # Glow SDK 用户手册
 
 `glow/starter` 是 Glow 框架的 Go 语言 SDK，提供了开箱即用的应用骨架和组件。通过使用 SDK，开发者可以轻松地将应用接入 Glow 的配置管理和资源绑定。
