@@ -44,3 +44,5 @@ examples/*/*-app
 
 # Build output
 dist/
+
+.worktrees/
