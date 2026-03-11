@@ -20,10 +20,7 @@ https://github.com/luaxlou/glow/blob/main/docs/quickstart_new_project.md
 存量项目流程卡（5 步）：
 https://github.com/luaxlou/glow/blob/main/docs/quickstart_existing_project.md
 
-AI 输出契约：
-https://github.com/luaxlou/glow/blob/main/docs/ai_output_contract.md
-
-### 模板 1：新项目引入 glow
+### 提示词模版：新项目引入 glow
 
 ```text
 请基于 glow 初始化一个新服务。
@@ -31,7 +28,7 @@ https://github.com/luaxlou/glow/blob/main/docs/ai_output_contract.md
 目标：快速接入 glowconfig + glowhttp，按需接入 mysql/redis/sqlite/websocket，并形成统一初始化范式。
 重点收益：通过 glow 的稳定约定、可组合能力和低心智负担，提升项目可维护性与团队交付效率。
 需解决问题：如何让项目在引入后持续享受 glow 设计哲学带来的收益，而不是一次性接入。
-输出要求：严格遵循 https://github.com/luaxlou/glow/blob/main/docs/ai_output_contract.md
+输出要求：给出实施计划、文件改动清单、收益说明与验证结果。
 完成后执行并反馈：go test ./... && go vet ./...
 ```
 
@@ -43,26 +40,9 @@ https://github.com/luaxlou/glow/blob/main/docs/ai_output_contract.md
 目标：迁移到 glow 的统一接入范式，减少重复样板并提升长期可维护性。
 重点收益：让项目获得边界清晰、可组合复用、低心智负担和稳定约定。
 需解决问题：如何把接入过程沉淀为可持续演进的工程基线。
-输出要求：严格遵循 https://github.com/luaxlou/glow/blob/main/docs/ai_output_contract.md
+输出要求：给出实施步骤、受影响文件清单、收益说明与验证结果。
 完成后执行并反馈：go test ./... && go vet ./...
 ```
-
-## 仓库优化方向（已落地）
-
-- P0 接入体验产品化：
-  - [新项目流程卡](./docs/quickstart_new_project.md)
-  - [存量项目流程卡](./docs/quickstart_existing_project.md)
-  - [AI 输出契约](./docs/ai_output_contract.md)
-- P1 Starter 一致性治理：
-  - [Starter 约定规范](./docs/starter_conventions.md)
-- P2 可组合能力矩阵：
-  - [Starter 组合矩阵](./docs/starter_composition_matrix.md)
-- P3 AI 协作契约化：
-  - [PR 模板](./.github/pull_request_template.md)
-- P4 示例与验证强化：
-  - [`examples/minimal-api`](./examples/minimal-api)
-  - [`examples/api-db-cache`](./examples/api-db-cache)
-  - [`examples/api-websocket`](./examples/api-websocket)
 
 ## 这个仓库包含什么
 

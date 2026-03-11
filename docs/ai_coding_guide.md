@@ -32,7 +32,7 @@
 1. 阅读流程卡：
    - 新项目：`docs/quickstart_new_project.md`
    - 存量项目：`docs/quickstart_existing_project.md`
-2. 按 `docs/ai_output_contract.md` 组织输出内容。
+2. 按固定结构组织输出内容：实施计划、改动文件清单、收益说明、验证结果。
 3. 执行统一验证命令并回报结果。
 
 ## 统一验证命令
