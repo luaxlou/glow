@@ -25,7 +25,7 @@ https://github.com/luaxlou/glow/blob/main/docs/quickstart_existing_project.md
 ```text
 请基于 glow 初始化一个新服务。
 请先阅读：https://github.com/luaxlou/glow/blob/main/docs/ai_coding_guide.md
-目标：快速接入 glowconfig + glowhttp，按需接入 mysql/redis/sqlite/websocket，并形成统一初始化范式。
+目标：基于 glow 建立统一、可组合的应用接入基线，并快速落地最小可运行服务。
 重点收益：通过 glow 的稳定约定、可组合能力和低心智负担，提升项目可维护性与团队交付效率。
 需解决问题：如何让项目在引入后持续享受 glow 设计哲学带来的收益，而不是一次性接入。
 输出要求：给出实施计划、文件改动清单、收益说明与验证结果。
