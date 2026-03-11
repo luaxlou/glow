@@ -46,3 +46,4 @@ examples/*/*-app
 dist/
 
 .worktrees/
+.gemini/commands/openspec/
