@@ -1,43 +1,22 @@
-# Glow Framework Examples
+# Glow Examples
 
-This directory contains framework-only examples for `starter/*` usage.
+本目录提供面向应用侧 starter 的可运行示例。
 
-## Scope
+## 示例清单
 
-Examples here demonstrate:
+- `simple-app`：最小配置读取示例
+- `minimal-api`：最小 HTTP 服务示例（`glowconfig` + `glowhttp`）
+- `api-db-cache`：HTTP + MySQL + Redis 组合示例
+- `api-websocket`：HTTP + WebSocket 组合示例
 
-- configuration loading via `starter/glowconfig`
-- HTTP/router initialization via `starter/glowhttp`
-- storage/client initialization via starter packages
+## 运行提示
 
-They intentionally do **not** include operations lifecycle workflows.
+示例默认读取项目根目录下的 `config.json`。
+请按示例中使用的 starter 准备对应配置字段。
 
-## simple-app
-
-`examples/simple-app` is a minimal SDK sample that reads values from `config.json`.
-
-### Run
+统一验证命令：
 
 ```bash
-cd examples/simple-app
-cat > config.json <<'JSON'
-{
-  "log_level": "debug",
-  "max_connections": 100,
-  "mysql_dsn": "root:password@tcp(localhost:3306)/demo",
-  "redis_addr": "localhost:6379",
-  "port": 8080
-}
-JSON
-
-go run ./cmd/simple-app
+go test ./...
+go vet ./...
 ```
-
-### Expected output
-
-The app prints configured values and exits.
-
-## Notes
-
-- Operations runtime (`glow-server`, deployment orchestration) is in the `glow-ops` repository.
-- Keep examples focused on SDK behavior only.

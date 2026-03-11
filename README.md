@@ -2,61 +2,67 @@
 
 ## 诞生理念
 
-`glow` 的诞生，不是为了再造一个“大而全框架”，而是为了解决 Go 业务项目里一个反复出现的问题：
+`glow` 的目标不是增加一个大而全框架，而是把 Go 项目里的高频基础接入沉淀成稳定约定，让团队持续获得这些收益：
 
-- 业务代码与基础接入代码（配置、HTTP、数据库、缓存）混在一起，项目越做越重。
-- 团队在每个服务里重复造轮子，启动方式、配置约定、组件接入风格不一致。
-- 业务开发被基础能力接入细节牵制，导致工程效率下降。
-
-所以 `glow` 的定位非常克制：
-
-- 只做应用侧框架能力（starter / sdk）
-- 让业务代码保持聚焦和可读
-- 通过稳定约定提升团队协作效率
-
-## 职责边界
-
-`glow` 的边界是应用侧框架能力本身：
-
-- 提供统一 starter 接入范式
-- 保持业务代码聚焦在领域逻辑
-- 避免在框架层承载与应用接入无关的能力
-
-## 设计原则
-
-- 轻量优先：只提供高频、稳定、可复用的 starter 能力。
-- 低心智负担：统一接入范式，降低新项目与新成员成本。
-- 可组合：按需引入组件，不强绑定完整技术栈。
-- 边界清晰：框架只承载应用接入相关职责。
+- 边界清晰：业务逻辑与基础接入职责分离
+- 可组合：按需引入 starter，避免绑定整套技术栈
+- 低心智负担：统一初始化范式，降低协作与接手成本
+- 稳定约定：减少重复样板，提升长期可维护性
 
 ## AI Coding 快速引入（可直接复制）
 
-### AI 提示词模板
+AI 协作文档（完整链接）：
+https://github.com/luaxlou/glow/blob/main/docs/ai_coding_guide.md
 
-以下模板面向“快速引入”，可直接复制到 AI IDE 使用。
-AI 协作文档（完整链接）：https://github.com/luaxlou/glow/blob/main/docs/ai_coding_guide.md
+新项目流程卡（5 步）：
+https://github.com/luaxlou/glow/blob/main/docs/quickstart_new_project.md
 
-#### 模板 1：新项目（基于 glow 初始化）
+存量项目流程卡（5 步）：
+https://github.com/luaxlou/glow/blob/main/docs/quickstart_existing_project.md
+
+AI 输出契约：
+https://github.com/luaxlou/glow/blob/main/docs/ai_output_contract.md
+
+### 模板 1：新项目引入 glow
 
 ```text
 请基于 glow 初始化一个新服务。
 请先阅读：https://github.com/luaxlou/glow/blob/main/docs/ai_coding_guide.md
-要求：使用 glowconfig + glowhttp，按需接入 mysql/redis/sqlite/websocket。
-约束：仅改动本仓库职责范围；优先复用 starter；避免无关重构。
-输出：先给实施计划，再给文件改动清单、启动命令、验证结果。
+目标：快速接入 glowconfig + glowhttp，按需接入 mysql/redis/sqlite/websocket，并形成统一初始化范式。
+重点收益：通过 glow 的稳定约定、可组合能力和低心智负担，提升项目可维护性与团队交付效率。
+需解决问题：如何让项目在引入后持续享受 glow 设计哲学带来的收益，而不是一次性接入。
+输出要求：严格遵循 https://github.com/luaxlou/glow/blob/main/docs/ai_output_contract.md
 完成后执行并反馈：go test ./... && go vet ./...
 ```
 
-#### 模板 2：现有项目（接入/改造 glow）
+### 模板 2：现有项目引入 glow
 
 ```text
-请在现有项目中最小侵入接入 glow starter。
+请在现有项目中引入 glow starter。
 请先阅读：https://github.com/luaxlou/glow/blob/main/docs/ai_coding_guide.md
-目标：识别并替换配置加载、HTTP 初始化、数据库连接等重复样板代码。
-约束：保持对外行为兼容；分步改造、每步可回滚；不做任务外重构。
-输出：受影响文件清单、关键差异说明、验证结果与回退方式。
+目标：迁移到 glow 的统一接入范式，减少重复样板并提升长期可维护性。
+重点收益：让项目获得边界清晰、可组合复用、低心智负担和稳定约定。
+需解决问题：如何把接入过程沉淀为可持续演进的工程基线。
+输出要求：严格遵循 https://github.com/luaxlou/glow/blob/main/docs/ai_output_contract.md
 完成后执行并反馈：go test ./... && go vet ./...
 ```
+
+## 仓库优化方向（已落地）
+
+- P0 接入体验产品化：
+  - [新项目流程卡](./docs/quickstart_new_project.md)
+  - [存量项目流程卡](./docs/quickstart_existing_project.md)
+  - [AI 输出契约](./docs/ai_output_contract.md)
+- P1 Starter 一致性治理：
+  - [Starter 约定规范](./docs/starter_conventions.md)
+- P2 可组合能力矩阵：
+  - [Starter 组合矩阵](./docs/starter_composition_matrix.md)
+- P3 AI 协作契约化：
+  - [PR 模板](./.github/pull_request_template.md)
+- P4 示例与验证强化：
+  - [`examples/minimal-api`](./examples/minimal-api)
+  - [`examples/api-db-cache`](./examples/api-db-cache)
+  - [`examples/api-websocket`](./examples/api-websocket)
 
 ## 这个仓库包含什么
 
@@ -66,7 +72,7 @@ AI 协作文档（完整链接）：https://github.com/luaxlou/glow/blob/main/do
 - [`starter/glowredis`](./starter/glowredis)：Redis 初始化
 - [`starter/glowsqlite`](./starter/glowsqlite)：SQLite 初始化
 - [`starter/glowwebsocket`](./starter/glowwebsocket)：WebSocket 适配
-- [`examples/`](./examples)：使用示例
+- [`examples/`](./examples)：示例集合
 - [`docs/sdk_manual.md`](./docs/sdk_manual.md)：SDK 手册
 
 ## 快速开始
@@ -81,17 +87,15 @@ go get github.com/luaxlou/glow/starter
 package main
 
 import (
-	"fmt"
+    "fmt"
 
-	"github.com/luaxlou/glow/starter/glowconfig"
+    "github.com/luaxlou/glow/starter/glowconfig"
 )
 
 func main() {
-	fmt.Println(glowconfig.GetString("log_level"))
+    fmt.Println(glowconfig.GetString("log_level"))
 }
 ```
-
-在应用目录准备 `config.json` 后直接运行即可。可参考 [`examples/simple-app`](./examples/simple-app)。
 
 ## 开发与验证
 
@@ -102,4 +106,4 @@ go vet ./...
 
 ## 相关项目（简述）
 
-`glow-ops` 是配套的部署基础设施项目，聚焦部署与运维生命周期，不属于本仓库实现范围。
+`glow-ops` 是配套部署基础设施项目，聚焦部署与运维生命周期，不属于本仓库实现范围。
