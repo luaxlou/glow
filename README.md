@@ -1,56 +1,59 @@
-# Glow（Framework）
+# Glow
 
-`glow` 是应用侧框架仓库，提供 Go Starter 与 SDK 使用范式。
+## 诞生理念
 
-## 快速决策：我该看哪个仓库？
+`glow` 的诞生，不是为了再造一个“大而全框架”，而是为了解决 Go 业务项目里一个反复出现的问题：
 
-| 你的目标 | 去哪个仓库 |
-|---|---|
-| 写业务代码、接入配置/HTTP/数据库 | [`glow`](https://github.com/luaxlou/glow) |
-| 做部署、运维编排、控制面治理 | [`glow-ops`](https://github.com/luaxlou/glow-ops) |
+- 业务代码与基础接入代码（配置、HTTP、数据库、缓存）混在一起，项目越做越重。
+- 团队在每个服务里重复造轮子，启动方式、配置约定、组件接入风格不一致。
+- 业务开发被运维流程细节牵制，导致工程效率下降。
 
-## 双仓关系图
+所以 `glow` 的定位非常克制：
 
-```text
-+-------------------+         depends on starters         +-------------------+
-|      glow-ops     | ----------------------------------> |       glow        |
-| (server/cli/ops)  |                                     | (starter/sdk)     |
-+-------------------+                                     +-------------------+
-```
+- 只做应用侧框架能力（starter / sdk）
+- 让业务代码保持聚焦和可读
+- 通过稳定约定提升团队协作效率
 
-## 这个仓库解决什么问题
+## 为什么拆分为两个仓库
 
-如果你是业务开发者，想在 Go 应用里快速接入：
+为彻底解耦职责，`glow` 与 `glow-ops` 已拆分为两个独立仓库：
 
-- 配置读取
-- HTTP 服务启动（Gin）
-- MySQL / Redis / SQLite 客户端初始化
-- WebSocket 能力
+- [`glow`](https://github.com/luaxlou/glow)：应用侧框架（starter / sdk）
+- [`glow-ops`](https://github.com/luaxlou/glow-ops)：部署与运维基础设施（`glow-server` / `glow-cli`）
 
-那你应该使用这个仓库。
+这不是组织形式调整，而是工程边界设计：
 
-## 你不该在这里找什么
+- 业务研发只关注应用构建与能力接入
+- 运维平台只关注部署生命周期与治理编排
+- 双方独立演进，避免相互牵制
 
-这个仓库**不包含**运维控制面能力：
+## 设计原则
 
-- 不包含 `glow-server`
-- 不包含 `glow-cli`
-- 不包含部署/回滚/进程托管/节点与 ingress 编排
+- 轻量优先：只提供高频、稳定、可复用的 starter 能力。
+- 低心智负担：统一接入范式，降低新项目与新成员成本。
+- 可组合：按需引入组件，不强绑定完整技术栈。
+- 边界清晰：框架不承载运维控制面职责。
 
-这些能力已经拆分到 [`glow-ops`](https://github.com/luaxlou/glow-ops) 仓库。
+## 这个仓库包含什么
 
-## 仓库结构
-
-- [`starter/glowconfig`](./starter/glowconfig)：本地配置读取
-- [`starter/glowhttp`](./starter/glowhttp)：HTTP 启动适配
+- [`starter/glowconfig`](./starter/glowconfig)：配置读取
+- [`starter/glowhttp`](./starter/glowhttp)：HTTP 服务启动适配（Gin）
 - [`starter/glowmysql`](./starter/glowmysql)：MySQL 初始化
 - [`starter/glowredis`](./starter/glowredis)：Redis 初始化
 - [`starter/glowsqlite`](./starter/glowsqlite)：SQLite 初始化
 - [`starter/glowwebsocket`](./starter/glowwebsocket)：WebSocket 适配
-- [`examples/`](./examples)：纯 SDK 示例
+- [`examples/`](./examples)：使用示例
 - [`docs/sdk_manual.md`](./docs/sdk_manual.md)：SDK 手册
 
-## 3 分钟上手
+## 这个仓库不包含什么
+
+以下能力不在 `glow`，请到 [`glow-ops`](https://github.com/luaxlou/glow-ops)：
+
+- `glow-server`
+- `glow-cli`
+- 部署编排、回滚、节点与入口治理
+
+## 快速开始
 
 ```bash
 go get github.com/luaxlou/glow/starter
@@ -63,6 +66,7 @@ package main
 
 import (
 	"fmt"
+
 	"github.com/luaxlou/glow/starter/glowconfig"
 )
 
@@ -79,7 +83,3 @@ func main() {
 go test ./...
 go vet ./...
 ```
-
-## 相关仓库
-
-- 运维控制面：[`glow-ops`](https://github.com/luaxlou/glow-ops)
