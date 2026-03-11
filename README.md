@@ -39,8 +39,8 @@ AI 协作文档（完整链接）：https://github.com/luaxlou/glow/blob/main/do
 #### 模板 1：新项目（基于 glow 初始化）
 
 ```text
+请基于 glow 初始化一个新服务。
 请先阅读：https://github.com/luaxlou/glow/blob/main/docs/ai_coding_guide.md
-你是 Go 工程师，请基于 glow 初始化一个新服务。
 要求：使用 glowconfig + glowhttp，按需接入 mysql/redis/sqlite/websocket。
 约束：仅改动本仓库职责范围；优先复用 starter；避免无关重构。
 输出：先给实施计划，再给文件改动清单、启动命令、验证结果。
@@ -50,8 +50,8 @@ AI 协作文档（完整链接）：https://github.com/luaxlou/glow/blob/main/do
 #### 模板 2：现有项目（接入/改造 glow）
 
 ```text
+请在现有项目中最小侵入接入 glow starter。
 请先阅读：https://github.com/luaxlou/glow/blob/main/docs/ai_coding_guide.md
-你是 Go 重构工程师，请在现有项目中最小侵入接入 glow starter。
 目标：识别并替换配置加载、HTTP 初始化、数据库连接等重复样板代码。
 约束：保持对外行为兼容；分步改造、每步可回滚；不做任务外重构。
 输出：受影响文件清单、关键差异说明、验证结果与回退方式。
