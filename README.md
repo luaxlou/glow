@@ -29,6 +29,35 @@
 - 可组合：按需引入组件，不强绑定完整技术栈。
 - 边界清晰：框架只承载应用接入相关职责。
 
+## AI Coding 快速引入（可直接复制）
+
+### AI 提示词模板
+
+以下模板面向“快速引入”，可直接复制到 AI IDE 使用。
+AI 协作文档（完整链接）：https://github.com/luaxlou/glow/blob/main/docs/ai_coding_guide.md
+
+#### 模板 1：新项目（基于 glow 初始化）
+
+```text
+请先阅读：https://github.com/luaxlou/glow/blob/main/docs/ai_coding_guide.md
+你是 Go 工程师，请基于 glow 初始化一个新服务。
+要求：使用 glowconfig + glowhttp，按需接入 mysql/redis/sqlite/websocket。
+约束：仅改动本仓库职责范围；优先复用 starter；避免无关重构。
+输出：先给实施计划，再给文件改动清单、启动命令、验证结果。
+完成后执行并反馈：go test ./... && go vet ./...
+```
+
+#### 模板 2：现有项目（接入/改造 glow）
+
+```text
+请先阅读：https://github.com/luaxlou/glow/blob/main/docs/ai_coding_guide.md
+你是 Go 重构工程师，请在现有项目中最小侵入接入 glow starter。
+目标：识别并替换配置加载、HTTP 初始化、数据库连接等重复样板代码。
+约束：保持对外行为兼容；分步改造、每步可回滚；不做任务外重构。
+输出：受影响文件清单、关键差异说明、验证结果与回退方式。
+完成后执行并反馈：go test ./... && go vet ./...
+```
+
 ## 这个仓库包含什么
 
 - [`starter/glowconfig`](./starter/glowconfig)：配置读取
@@ -39,11 +68,6 @@
 - [`starter/glowwebsocket`](./starter/glowwebsocket)：WebSocket 适配
 - [`examples/`](./examples)：使用示例
 - [`docs/sdk_manual.md`](./docs/sdk_manual.md)：SDK 手册
-
-## 这个仓库不包含什么
-
-- 与应用 starter / sdk 无关的能力
-- 与当前任务目标无关的大规模重构
 
 ## 快速开始
 
@@ -69,78 +93,13 @@ func main() {
 
 在应用目录准备 `config.json` 后直接运行即可。可参考 [`examples/simple-app`](./examples/simple-app)。
 
-## 面向 AI Coding 的设计
-
-`glow` 在设计上尽量让 AI Agent 能低成本理解并稳定改动：
-
-- 约定优先：starter 按功能拆包，目录语义稳定，降低检索成本。
-- 边界清晰：只围绕应用侧能力改动，避免任务外扩。
-- 最小可运行路径：从 `examples/` 到 starter 包形成可追踪调用链。
-- 验证标准统一：默认使用 `go test ./...` 与 `go vet ./...` 做交付前校验。
-
-### AI 快速导航
-
-- 应用接入入口：[`examples/simple-app`](./examples/simple-app)
-- 配置能力：[`starter/glowconfig`](./starter/glowconfig)
-- HTTP 能力：[`starter/glowhttp`](./starter/glowhttp)
-- 数据库与缓存：[`starter/glowmysql`](./starter/glowmysql)、[`starter/glowredis`](./starter/glowredis)、[`starter/glowsqlite`](./starter/glowsqlite)
-- 实时通信：[`starter/glowwebsocket`](./starter/glowwebsocket)
-- 使用说明：[`docs/sdk_manual.md`](./docs/sdk_manual.md)
-
-### AI 提示词模板
-
-以下提示词可直接用于 AI Coding 场景。
-建议在提示词中先要求 AI 阅读 [`docs/ai_coding_guide.md`](./docs/ai_coding_guide.md) 再执行。
-
-#### 模板 1：新项目（基于 glow 初始化）
-
-```text
-你是 Go 架构师，请基于 glow 为我初始化一个新服务。
-
-执行前请先阅读：docs/ai_coding_guide.md
-
-目标：
-1. 使用 glow 的 starter 完成配置读取、HTTP 启动与必要的数据组件接入。
-2. 保持业务代码与基础设施代码解耦。
-3. 提供最小可运行示例与目录说明。
-
-约束：
-1. 只在 glow 应用侧范畴内实现，不引入任务边界外能力。
-2. 代码风格保持简洁，优先使用现有 starter，不重复造轮子。
-3. 完成后必须执行并反馈 go test ./... 与 go vet ./... 的结果。
-
-输出要求：
-1. 先给出改动计划，再逐步实施。
-2. 明确新增/修改的文件路径与原因。
-3. 提供启动命令与验证步骤。
-```
-
-#### 模板 2：现有项目（接入/改造 glow）
-
-```text
-你是 Go 重构工程师，请在现有项目中引入 glow starter 并做最小侵入改造。
-
-执行前请先阅读：docs/ai_coding_guide.md
-
-当前目标：
-1. 识别现有配置加载、HTTP 初始化、数据库连接代码。
-2. 用 glow 对应 starter 替换重复样板代码。
-3. 保持对外行为兼容，不做与目标无关的重构。
-
-约束：
-1. 先审阅项目结构并给出分步改造方案，不直接大面积改动。
-2. 每次改动控制在可回滚粒度，说明风险点与回退方式。
-3. 改造完成后必须执行 go test ./... 与 go vet ./...，并汇总结果。
-
-输出要求：
-1. 列出受影响模块、文件与接口。
-2. 给出改造前后关键差异（初始化路径、配置入口、依赖注入方式）。
-3. 说明后续可选优化项，但不要在本次直接实现。
-```
-
 ## 开发与验证
 
 ```bash
 go test ./...
 go vet ./...
 ```
+
+## 相关项目（简述）
+
+`glow-ops` 是配套的部署基础设施项目，聚焦部署与运维生命周期，不属于本仓库实现范围。
