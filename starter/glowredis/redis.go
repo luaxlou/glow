@@ -41,12 +41,12 @@ func Client() (*redis.Client, error) {
 		return client, nil
 	}
 
-	// NOTE: With local-config-only mode (post `glow apply`), we don't request resources at runtime.
+	// NOTE: With local-config-only mode (with local config mode), we don't request resources at runtime.
 	// Keep legacy naming convention documented here for compatibility, but avoid unused vars.
 
 	log.Printf("Lazy initializing Redis Starter...")
 
-	// Read Redis config from local config (set by `glow apply`)
+	// Read Redis config from local config (provided by local config file)
 	addr := glowconfig.GetString("redis.addr")
 	if addr == "" {
 		return nil, fmt.Errorf("redis_addr not found in config")
