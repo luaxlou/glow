@@ -2,6 +2,22 @@
 
 `glow` 是应用侧框架仓库，提供 Go Starter 与 SDK 使用范式。
 
+## 快速决策：我该看哪个仓库？
+
+| 你的目标 | 去哪个仓库 |
+|---|---|
+| 写业务代码、接入配置/HTTP/数据库 | [`glow`](https://github.com/luaxlou/glow) |
+| 做部署、运维编排、控制面治理 | [`glow-ops`](https://github.com/luaxlou/glow-ops) |
+
+## 双仓关系图
+
+```text
++-------------------+         depends on starters         +-------------------+
+|      glow-ops     | ----------------------------------> |       glow        |
+| (server/cli/ops)  |                                     | (starter/sdk)     |
++-------------------+                                     +-------------------+
+```
+
 ## 这个仓库解决什么问题
 
 如果你是业务开发者，想在 Go 应用里快速接入：
